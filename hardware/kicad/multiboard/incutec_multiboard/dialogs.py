@@ -1447,7 +1447,7 @@ class MainDialog(BaseDialog):
             return
 
         board_dir = pcb_path.parent
-        # OpenDrone fork: only ever remove a boards/<name>/ folder, never the
+        # Incutec fork: only ever remove a boards/<name>/ folder, never the
         # project directory itself (flat layout) or a parent that happens to
         # contain "boards" in its path
         if (board_dir.exists() and board_dir.parent.name == BOARDS_DIR

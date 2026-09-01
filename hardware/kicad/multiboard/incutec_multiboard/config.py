@@ -163,10 +163,10 @@ class ProjectConfig:
     version: str = CONFIG_VERSION
     root_schematic: str = ""
     root_pcb: str = ""
-    layout: str = "subdirs"        # OpenDrone fork: "subdirs" (upstream, boards/<name>/) or "flat" (next to the root project)
-    generate_blocks: bool = True   # OpenDrone fork: block footprints are optional
-    work_dir: str = ""             # OpenDrone fork: where the log and temp netlist go, relative to the project
-    default_board: str = ""        # OpenDrone fork: the board that receives unplaced parts in an all-boards update
+    layout: str = "subdirs"        # Incutec fork: "subdirs" (upstream, boards/<name>/) or "flat" (next to the root project)
+    generate_blocks: bool = True   # Incutec fork: block footprints are optional
+    work_dir: str = ""             # Incutec fork: where the log and temp netlist go, relative to the project
+    default_board: str = ""        # Incutec fork: the board that receives unplaced parts in an all-boards update
     boards: Dict[str, BoardConfig] = field(default_factory=dict)
 
     def to_dict(self) -> dict:

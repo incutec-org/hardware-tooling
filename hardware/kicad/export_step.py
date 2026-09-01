@@ -62,7 +62,7 @@ Clipping needs pcbnew, so run with KiCad's bundled Python, same as
 render_board.py. Without it the export still runs, unclipped, with a warning:
 
   KPY=/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3
-  $KPY scripts/kicad/export_step.py --all --root path/to/hardware
+  $KPY hardware/kicad/export_step.py --all --root path/to/hardware
 
 KiCad may stay open: every board edit happens on a temp copy.
 

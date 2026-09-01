@@ -70,8 +70,8 @@ def expand(path, project_dir):
 
     Shared with export_step so this reads the SAME variables kicad-cli
     does, KiCad's own settings and the project's text_variables included.
-    A hardcoded list of the built-ins used to report every ${OPENDRONE_LIB}
-    reference as a missing file.
+    A hardcoded list of the built-ins used to report every custom KiCad path
+    variable reference as a missing file.
     """
     return expand_path(path, project_dir)
 

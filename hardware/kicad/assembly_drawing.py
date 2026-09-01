@@ -25,7 +25,7 @@ import argparse, math, os, shutil, subprocess, sys
 try:
     import pcbnew
 except ImportError:
-    sys.exit("needs KiCad's bundled Python (pcbnew); see OpenDrone-Scripts README")
+    sys.exit("needs KiCad's bundled Python (pcbnew); see the hardware-tooling README")
 
 MM = 1e6  # pcbnew internal units per mm
 

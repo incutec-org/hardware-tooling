@@ -4,8 +4,8 @@ sub-board (or the named ones) without opening KiCad. Same code path as the
 plugin's Update button, so the GUI and this script cannot disagree.
 
   KPY=/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3
-  $KPY kicad/multiboard/update.py path/to/hardware              # all boards
-  $KPY kicad/multiboard/update.py path/to/hardware board-name  # one board
+  $KPY hardware/kicad/multiboard/update.py path/to/hardware              # all boards
+  $KPY hardware/kicad/multiboard/update.py path/to/hardware board-name  # one board
 
 Ownership: a footprint belongs to the board it is already on. A symbol that is
 on no board yet goes to the board you name (one-board call, same as the Update
@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from opendrone_multiboard.manager import MultiBoardManager  # noqa: E402
+from incutec_multiboard.manager import MultiBoardManager  # noqa: E402
 
 
 def main():

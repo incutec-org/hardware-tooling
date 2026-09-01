@@ -20,7 +20,7 @@ pixel-identical, so nothing was gained by the risk.
 MUST be run with KiCad's bundled Python (it imports pcbnew):
 
   /Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3 \
-      scripts/kicad/render_board.py hardware/4in1.kicad_pcb --top images/front.png --bottom images/back.png
+      hardware/kicad/render_board.py hardware/board.kicad_pcb --top images/front.png --bottom images/back.png
 
 KiCad may stay OPEN: the source board is never written.
 

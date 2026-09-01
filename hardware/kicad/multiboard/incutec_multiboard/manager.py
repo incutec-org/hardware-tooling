@@ -130,7 +130,7 @@ class FootprintResolver:
         if fp is None:
             self._failed.add(cache_key)
         elif lib_nick:
-            fp.SetFPID(pcbnew.LIB_ID(lib_nick, fp_name))   # OpenDrone fork: keep the nickname, else the next update "replaces" it
+            fp.SetFPID(pcbnew.LIB_ID(lib_nick, fp_name))   # Incutec fork: keep the nickname, else the next update "replaces" it
         return fp
 
     def _try_load(self, lib_nick: str, fp_name: str) -> Optional[pcbnew.FOOTPRINT]:
@@ -252,7 +252,7 @@ class MultiBoardManager:
     def _detect_root_files(self):
         """Auto-detect the root schematic and PCB files.
 
-        OpenDrone fork: a configured root_schematic wins. With the flat layout
+        Incutec fork: a configured root_schematic wins. With the flat layout
         several .kicad_pro files share the directory and the glob order is
         arbitrary."""
         if self.config.root_schematic and (self.project_dir / self.config.root_schematic).exists():
@@ -334,8 +334,8 @@ class MultiBoardManager:
             for match in RE_FP_LIB_ENTRY.finditer(content):
                 nick, uri = match.group(1), match.group(2)
                 expanded = uri.replace("${KIPRJMOD}", str(self.project_dir))
-                # OpenDrone fork: expand KiCad path variables (Preferences >
-                # Configure Paths) and environment variables, e.g. ${OPENDRONE_LIB}
+                # Incutec fork: expand KiCad path variables (Preferences >
+                # Configure Paths) and environment variables, e.g. ${KICAD_SHARED_LIB}
                 expanded = re.sub(r"\$\{([A-Za-z0-9_]+)\}", lambda m: env.get(m.group(1), m.group(0)), expanded)
                 if "${" not in expanded:
                     self._fp_lib_paths[nick] = Path(expanded)
@@ -345,7 +345,7 @@ class MultiBoardManager:
             pass
 
     def _kicad_path_vars(self) -> Dict[str, str]:
-        """OpenDrone fork: KiCad's configured path variables (kicad_common.json
+        """Incutec fork: KiCad's configured path variables (kicad_common.json
         of every installed major version, newest first) under the environment."""
         env: Dict[str, str] = {}
         bases = [Path.home() / "Library" / "Preferences" / "kicad",
@@ -379,7 +379,7 @@ class MultiBoardManager:
             self._kicad_cli = exe
             return exe
 
-        # OpenDrone fork: GUI apps on macOS do not get the shell PATH
+        # Incutec fork: GUI apps on macOS do not get the shell PATH
         for cand in ("/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
                      os.path.expanduser("~/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"),
                      "/usr/local/bin/kicad-cli", "/opt/homebrew/bin/kicad-cli", "/usr/bin/kicad-cli"):
@@ -444,7 +444,7 @@ class MultiBoardManager:
             root_sch = self.project_dir / self.config.root_schematic
             if root_sch.exists():
                 self._link_file(root_sch, board_dir / f"{base_name}.kicad_sch")
-                # OpenDrone fork: flat layout, the sub-sheets and the lib
+                # Incutec fork: flat layout, the sub-sheets and the lib
                 # tables are already in this directory; linking a file onto
                 # itself would delete it
                 if flat:
@@ -474,7 +474,7 @@ class MultiBoardManager:
         """
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-        # OpenDrone fork: relative symlink first. Git stores a symlink, it
+        # Incutec fork: relative symlink first. Git stores a symlink, it
         # cannot store a hardlink, so a clone comes up linked without running
         # the plugin. Hardlink stays as the fallback (Windows without
         # developer mode).
@@ -552,7 +552,7 @@ class MultiBoardManager:
             return False, f"Board '{name}' already exists"
 
         safe_name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name)
-        if self.config.layout == "flat":   # OpenDrone fork
+        if self.config.layout == "flat":   # Incutec fork
             rel_path = f"{safe_name}.kicad_pcb"
         else:
             rel_path = f"{BOARDS_DIR}/{safe_name}/{safe_name}.kicad_pcb"
@@ -577,7 +577,7 @@ class MultiBoardManager:
                 pass
             return False, str(e)
 
-        if self.config.generate_blocks:   # OpenDrone fork: optional
+        if self.config.generate_blocks:   # Incutec fork: optional
             self._generate_block_footprint(board)
             self._ensure_lib_in_table(BLOCK_LIB_NAME, f"{BLOCK_LIB_NAME}.pretty")
 
@@ -944,7 +944,7 @@ class MultiBoardManager:
         This is the main synchronization pipeline that imports components
         from the shared schematic into a specific sub-board.
 
-        OpenDrone fork: claim_new=False only refreshes the footprints this
+        Incutec fork: claim_new=False only refreshes the footprints this
         board already owns and leaves unplaced components alone, so several
         boards can be updated in one pass without the first one grabbing
         every new part.
@@ -1204,9 +1204,9 @@ class MultiBoardManager:
                     value = (child.text or "").strip()
                 elif tag == "tstamp":
                     tstamp = (child.text or "").strip()
-                elif tag == "tstamps":   # OpenDrone fork: KiCad 7+ name of the symbol uuid
+                elif tag == "tstamps":   # Incutec fork: KiCad 7+ name of the symbol uuid
                     tstamp = (child.text or "").strip()
-                elif tag == "sheetpath":  # OpenDrone fork: sheet uuid path, "/" for the root
+                elif tag == "sheetpath":  # Incutec fork: sheet uuid path, "/" for the root
                     sheetpath = child.get("tstamps", "/") or "/"
                 elif tag == "property":
                     pname = (child.get("name") or "").strip()
@@ -1273,7 +1273,7 @@ class MultiBoardManager:
     def _set_fp_path(self, fp, path: str):
         """Set the schematic path on a footprint (sheet uuids + symbol uuid,
         the same string KiCad's own Update PCB writes, so cross-probing and a
-        later native update match this footprint). OpenDrone fork: full path,
+        later native update match this footprint). Incutec fork: full path,
         upstream wrote only the symbol uuid."""
         if path:
             try:

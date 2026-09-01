@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[1]
-KICAD = REPO / "kicad"
+KICAD = REPO / "hardware" / "kicad"
 sys.path.insert(0, str(KICAD))
 
 from pcb_extract import parse_board  # noqa: E402

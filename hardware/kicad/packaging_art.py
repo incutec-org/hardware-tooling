@@ -19,7 +19,7 @@ copies. KiCad may stay open.
 MUST be run with KiCad's bundled Python (it imports pcbnew):
 
   KPY=/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3
-  $KPY scripts/kicad/packaging_art.py hardware/4in1.kicad_pcb --outdir packaging/ --png
+  $KPY hardware/kicad/packaging_art.py path/to/board.kicad_pcb --outdir packaging/ --png
 
 Examples:
   # gold-on-white theme (default), SVG + PNG previews

@@ -23,22 +23,20 @@ throwaway *copy* of the library with the new symbol appended, lifts only
 the new block out of that copy, and splices it into the real file, then
 asserts the pre-existing bytes are untouched.
 
-Library naming is per repo, not a convention: OpenESC-20x20 uses
-components.kicad_sym + 4in1ESC.pretty, OpenESC-30x30 uses components +
-4in1ESC-30x30, everything else uses lib + lib. The target is read from the
-repo's own sym-lib-table and fp-lib-table, and is the entry sitting directly
-in hardware/ as ${KIPRJMOD}/<name>. That excludes the shared parts catalogue,
-which OpenFC-Core registers as a KiCad-Library submodule path and OpenAIO as
-${OPENDRONE_LIB} plus three alias nicknames: an import must never land there,
-because promotion into the catalogue is a deliberate step for parts already on
-a manufactured board.
+Library naming is per repository, not a global convention. The target is read
+from the repository's own `sym-lib-table` and `fp-lib-table`, and is the entry
+sitting directly in the selected hardware directory as
+`${KIPRJMOD}/<name>`. That excludes shared catalogues registered through a
+submodule path or a custom KiCad path variable: importing into another
+repository must be a deliberate promotion, not a side effect of drawing a
+part.
 
 Needs easyeda2kicad (pip install easyeda2kicad) and KiCad 10's kicad-cli.
 Pure text surgery plus kicad-cli, so system python3 is fine; this one does
 not import pcbnew.
 
 Usage:
-    python3 import_part.py C30170185 --repo ~/OpenDrone/hardware/OpenESC-20x20/hardware
+    python3 import_part.py C30170185 --repo path/to/project/hardware
     python3 import_part.py C30170185 C19268033 --repo <hardware-dir> --ref J \
         --description "MR30 3-pin THT power connector, male, PCB mount" \
         --description "MR30 3-pin THT power connector, female, PCB mount"
@@ -81,12 +79,10 @@ def read_lib_tables(hardware: Path, fp_override=None, sym_override=None):
 
     The target is the repo's *own* import library: the entry whose file sits
     directly in hardware/, as `${KIPRJMOD}/<name>.pretty`. That deliberately
-    rejects the shared parts catalogue, which OpenFC-Core registers as
-    `${KIPRJMOD}/KiCad-Library/footprint/OpenDrone.pretty` (a submodule) and
-    OpenAIO as `${OPENDRONE_LIB}/...` plus three alias nicknames pointing at
-    the same files. Writing an import into the catalogue would be wrong twice
-    over: it is someone else's repo, and membership there is a deliberate
-    promotion step, not a side effect of drawing a part.
+    rejects shared catalogues registered through a nested submodule path or a
+    custom KiCad path variable. Writing an import into a catalogue would be
+    wrong twice over: it is another repository, and membership there is a
+    deliberate promotion step, not a side effect of drawing a part.
     """
     def own_entries(table: Path, suffix: str):
         if not table.is_file():
