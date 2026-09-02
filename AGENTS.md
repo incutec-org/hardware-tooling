@@ -15,3 +15,10 @@ embedded credentials or company records, and make external side effects opt-in.
 Preserve documented compatibility and update tests when behavior changes.
 
 Validate with `python3 -m pytest tests/`.
+
+## Visual index
+
+`OVERVIEW.md` is the diagram-only map of this repository: structure, pipelines,
+and cross-repository handoffs. Change it in the same commit that adds, removes,
+or renames a top-level directory, a pipeline step, or a handoff. Check with
+`python3 overview_check.py .`.
