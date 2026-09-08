@@ -21,6 +21,9 @@ Produces production/quote-pack-<rev>/ with, for every big supplier:
                              rejects anything but their xlsx layout)
   <stem>_bom_pcbgogo.xlsx    PCBGOGO template columns (bare TPs marked DNS)
   <stem>_positions.csv/.zip  FT pick and place (JLC rotation convention)
+  <stem>_assembly_top.svg/.png     assembly map: every pad, pin 1 red,
+                             not-placed parts hatched (assembly_drawing.py)
+  <stem>_assembly_bottom.svg/.png  same, MIRRORED (viewed from below)
 
 --skip-ft reuses the existing FT export in production/ instead of
 re-running Fabrication Toolkit headless. --boms-only additionally leaves
@@ -241,8 +244,13 @@ def main():
         with zipfile.ZipFile(pz, 'w', zipfile.ZIP_DEFLATED) as z:
             z.write(os.path.join(pack, f'{stem}_positions.csv'),
                     f'{stem}_positions.csv')
+        # per-side assembly maps belong to the same board state as the
+        # gerbers and positions, so they are refreshed together with them
+        sys.path.insert(0, here)
+        import assembly_drawing
+        assembly_drawing.render(board, stem, pack, dpi=300, png=True)
 
-    print(f"{pack}: {len(rows)} BOM lines -> universal, jlcpcb, nextpcb, makerpcb, pcbgogo{' (boms only)' if a.boms_only else ' + gerbers, portal, positions'}")
+    print(f"{pack}: {len(rows)} BOM lines -> universal, jlcpcb, nextpcb, makerpcb, pcbgogo{' (boms only)' if a.boms_only else ' + gerbers, portal, positions, assembly maps'}")
 
     r = subprocess.run([sys.executable, os.path.join(here, 'check_export.py'),
                         board, '--prefix', stem], capture_output=True, text=True)
