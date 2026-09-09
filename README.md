@@ -5,6 +5,16 @@ create, inspect, release, and hand off hardware projects. Product portfolios
 such as OpenDrone keep their own policy, accepted exceptions, naming, and
 publication orchestration in their own repositories.
 
+## Role in the wider flow
+
+`scripts` is a reusable transformation engine, not an information stage. A
+product repository owns design intent; `production` invokes these tools to
+create a controlled manufacturing release; `sourcing` supplies that release to
+the supplier network. This repository stores no product release, quotation,
+supplier decision, purchase order, stock, or test evidence. The complete flow
+is documented in
+[`../workspace/HARDWARE_FLOW.md`](../workspace/HARDWARE_FLOW.md).
+
 The repository is intentionally split by concern:
 
 ```text
@@ -44,11 +54,12 @@ command explicitly says otherwise.
 | --- | --- |
 | `fab_export.py` | Run the KiCad Fabrication Toolkit headlessly. |
 | `universal_bom.py` | Generate a manufacturer/MPN-aware BOM. |
-| `quote_pack.py` | Assemble generic and supplier-formatted fabrication inputs. |
+| `quote_pack.py` | Assemble generic and supplier-formatted fabrication inputs: Gerbers, BOMs, positions, and both assembly maps. |
 | `portal_gerbers.py` | Produce a compatibility copy for limited upload parsers. |
 | `gerber_check.py` | Classify and validate a Gerber archive. |
-| `assembly_drawing.py` | Render per-side assembly drawings with pin-1 markings. |
+| `assembly_drawing.py` | Render per-side assembly maps (SVG + PNG) with pin 1 in red, not-placed parts hatched, bottom side mirrored; also called by `quote_pack.py`. |
 | `import_part.py` | Import an LCSC part into an explicitly selected project library. |
+| `add_mpn_fields.py` | Enrich explicitly selected schematics from an opt-in LCSC lookup cache. |
 | `set_edgecuts_width.py` | Normalize `Edge.Cuts` widths; dry-run unless `--write` is passed. |
 
 ## Images and CAD exports
