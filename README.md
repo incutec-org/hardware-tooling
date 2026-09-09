@@ -19,6 +19,7 @@ The repository is intentionally split by concern:
 
 ```text
 hardware/kicad/                 reusable KiCad inspection and export tools
+hardware/freecad/               Onshape Part Studio to FreeCAD conversion
 hardware/release/               hardware release preparation and approval gates
 templates/hardware-repository/ generic starting point for a hardware repo
 tests/                          hardware-tool regression tests
@@ -61,6 +62,21 @@ command explicitly says otherwise.
 | `import_part.py` | Import an LCSC part into an explicitly selected project library. |
 | `add_mpn_fields.py` | Enrich explicitly selected schematics from an opt-in LCSC lookup cache. |
 | `set_edgecuts_width.py` | Normalize `Edge.Cuts` widths; dry-run unless `--write` is passed. |
+
+## Onshape to FreeCAD
+
+Tools that rebuild an Onshape Part Studio as a native, parametric FreeCAD
+PartDesign tree. They run inside FreeCAD (`freecadcmd`) except where noted.
+
+| Tool | Purpose |
+| --- | --- |
+| `freecad_setup.py` | Install a curated FreeCAD 1.1 addon set and preferences; dry-run unless `--install` is passed. |
+| `onshape_fsrep.py` | Parse a Part Studio FeatureScript representation into plain feature data. |
+| `onshape_query.py` | Decode Onshape compressed query strings from that representation. |
+| `onshape_resolve.py` | Resolve every feature's queries to 3D probe geometry through FeatureScript evaluation. |
+| `fc_sketch.py` | Build FreeCAD sketches at the solved Onshape coordinates, keeping only constraints that still solve. |
+| `fc_regions.py` | Expose Onshape sketch regions as parametric FreeCAD profile objects. |
+| `onshape_to_freecad.py` | Drive the above into a complete PartDesign tree with a conversion report. |
 
 ## Images and CAD exports
 
