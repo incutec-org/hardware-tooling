@@ -2,6 +2,7 @@
 """One-shot fab-agnostic quote pack for a board.
 
     $KPY quote_pack.py <board.kicad_pcb> [--name STEM] [--skip-ft] [--boms-only]
+                      [--panel-of <board>_bom_universal.csv ...]
 
 STEM defaults to ARCHIVE_NAME in fabrication-toolkit-options.json next to
 the board and must follow the org convention <Repo>-<rev> (lowercase rev,
@@ -190,6 +191,10 @@ def main():
     ap.add_argument('--name')
     ap.add_argument('--skip-ft', action='store_true')
     ap.add_argument('--boms-only', action='store_true')
+    ap.add_argument('--panel-of', action='append', default=[], metavar='BOM',
+                    help='source board _bom_universal.csv, once per board on a '
+                         'panel; forwarded to check_export, which has no '
+                         'schematic to check a panel against')
     a = ap.parse_args()
 
     board = os.path.abspath(a.board)
@@ -252,8 +257,10 @@ def main():
 
     print(f"{pack}: {len(rows)} BOM lines -> universal, jlcpcb, nextpcb, makerpcb, pcbgogo{' (boms only)' if a.boms_only else ' + gerbers, portal, positions, assembly maps'}")
 
+    panel_args = [x for p in a.panel_of for x in ('--panel-of', p)]
     r = subprocess.run([sys.executable, os.path.join(here, 'check_export.py'),
-                        board, '--prefix', stem], capture_output=True, text=True)
+                        board, '--prefix', stem] + panel_args,
+                       capture_output=True, text=True)
     for line in (r.stdout + r.stderr).splitlines():
         if line.startswith(('C0', 'C1', 'C2', 'C3', '==')):
             print(line)

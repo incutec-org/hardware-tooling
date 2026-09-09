@@ -47,7 +47,7 @@ command explicitly says otherwise.
 | `pcb_extract.py` | Export footprints, pad connectivity, and net counts from a board. |
 | `connectivity_report.py` | Produce CSV and Markdown connectivity reports. |
 | `check_models.py` | Check board and library 3D-model references before export. |
-| `check_export.py` | Compare a fabrication export with its board and schematic. |
+| `check_export.py` | Compare a fabrication export with its board and schematic; `--panel-of` checks a panel against its source board BOMs instead. |
 
 ## Manufacturing data
 

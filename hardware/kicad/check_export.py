@@ -11,8 +11,15 @@ Checks, all mechanical:
   C4  footprints with no row in the toolkit's transformations.csv keep
       KiCad's rotation: listed for a manual rotation check
 
+A panel has no schematic, so C2 and C3 cannot run. Pass --panel-of once per
+source board (their released `_bom_universal.csv`) and C3 instead requires the
+panel BOM, grouped by LCSC, to equal the sum of those BOMs exactly. Each source
+BOM has already been checked against its own board and schematic, so a panel
+that matches their sum is verified against every one of them.
+
 Usage:
     python3 check_export.py <board.kicad_pcb> [--prefix NAME] [--tf CSV]
+    python3 check_export.py <panel.kicad_pcb> --panel-of A_bom_universal.csv ...
 
 The export set is <board dir>/production/<ARCHIVE_NAME>_{bom,designators,
 positions}.csv; ARCHIVE_NAME is read from fabrication-toolkit-options.json
@@ -100,11 +107,65 @@ def read_export(prod, prefix):
     return desg, bom, pos
 
 
+def bom_by_lcsc(rows):
+    """LCSC -> total quantity, from `<prefix>_bom.csv` rows."""
+    q = collections.Counter()
+    for row in rows:
+        if len(row) >= 5 and row[4].strip():
+            q[row[4].strip()] += int(row[2])
+    return q
+
+
+def universal_by_lcsc(path):
+    """LCSC -> total quantity, from a released `_bom_universal.csv`."""
+    q = collections.Counter()
+    with open(path, encoding="utf-8-sig") as f:
+        for r in csv.DictReader(f):
+            if r["LCSC"].strip():
+                q[r["LCSC"].strip()] += int(r["Quantity"])
+    return q
+
+
+def panel_checks(bom, sources, fails):
+    """C3 for a panel: its BOM must equal the sum of the source board BOMs."""
+    print("C2 skip  panel has no schematic; checked against the source BOMs")
+    want = collections.Counter()
+    for path in sources:
+        if not os.path.exists(path):
+            sys.exit(f"missing source BOM: {path}")
+        want += universal_by_lcsc(path)
+    have = bom_by_lcsc(bom)
+    diffs = [f"{k}: panel {have.get(k, 0)} != boards {want.get(k, 0)}"
+             for k in sorted(set(have) | set(want)) if have.get(k, 0) != want.get(k, 0)]
+    if diffs:
+        fails.append("C3")
+        print(f"C3 FAIL  {len(diffs)} LCSC quantities differ from the source boards")
+        for d in diffs[:8]:
+            print(f"         {d}")
+    else:
+        print(f"C3 ok    {len(have)} LCSC part numbers, {sum(have.values())} placements, "
+              f"panel BOM == sum of {len(sources)} source board BOMs")
+
+
+def rotation_check(a, inc):
+    """C4, shared by the board and panel paths."""
+    if a.tf and os.path.exists(a.tf):
+        with open(a.tf, encoding="utf-8-sig") as f:
+            known = {row[0] for row in csv.reader(f) if row}
+        unknown = sorted({fp for r, fp in inc
+                          if fp and not any(k in fp for k in known)})
+        print(f"C4 note  {len(unknown)} footprint patterns keep KiCad rotation "
+              f"(check by eye): {unknown[:8]}{' ...' if len(unknown) > 8 else ''}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("board")
     ap.add_argument("--prefix")
     ap.add_argument("--tf", help="transformations.csv from the toolkit")
+    ap.add_argument("--panel-of", action="append", default=[], metavar="BOM",
+                    help="source board _bom_universal.csv; repeat once per board "
+                         "on the panel. Replaces C2/C3, which need a schematic.")
     a = ap.parse_args()
     bdir = os.path.dirname(os.path.abspath(a.board))
     prefix = a.prefix
@@ -146,6 +207,19 @@ def main():
     else:
         print(f"C1 ok    {len(export_set)} designators match the board "
               f"({len(exc)} of them excluded from BOM)")
+
+    # C2/C3 need a schematic. A panel has none, so it is checked against the
+    # source board BOMs instead: same evidence, one step removed.
+    if a.panel_of:
+        panel_checks(bom, a.panel_of, fails)
+        rotation_check(a, inc)
+        name = os.path.basename(a.board)
+        if fails:
+            print(f"== {name}: {'/'.join(fails)} FAILED against {prefix}")
+            return 1
+        print(f"== {name}: panel {prefix} is consistent with the board "
+              f"and its {len(a.panel_of)} source board BOMs")
+        return 0
 
     # C2 board-only vs schematic
     sch = os.path.splitext(a.board)[0] + ".kicad_sch"
@@ -190,13 +264,7 @@ def main():
               f"{no_lcsc[:12]}{' ...' if len(no_lcsc) > 12 else ''}")
 
     # C4 rotation coverage
-    if a.tf and os.path.exists(a.tf):
-        with open(a.tf, encoding="utf-8-sig") as f:
-            known = {row[0] for row in csv.reader(f) if row}
-        unknown = sorted({fp for r, fp in inc
-                          if fp and not any(k in fp for k in known)})
-        print(f"C4 note  {len(unknown)} footprint patterns keep KiCad rotation "
-              f"(check by eye): {unknown[:8]}{' ...' if len(unknown) > 8 else ''}")
+    rotation_check(a, inc)
 
     name = os.path.basename(a.board)
     if fails:
