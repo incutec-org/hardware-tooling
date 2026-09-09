@@ -61,6 +61,8 @@ command explicitly says otherwise.
 | `assembly_drawing.py` | Render per-side assembly maps (SVG + PNG) with pin 1 in red, not-placed parts hatched, bottom side mirrored; also called by `quote_pack.py`. |
 | `import_part.py` | Import an LCSC part into an explicitly selected project library. |
 | `add_mpn_fields.py` | Enrich explicitly selected schematics from an opt-in LCSC lookup cache. |
+| `panel_renumber.py` | Make references unique across a panel in blocks of 100 per board and write the refmap; dry-run unless `--write` is passed. |
+| `panel_sync_fields.py` | Copy LCSC, Manufacturer and MPN onto a panel from its source boards through the refmap; dry-run unless `--write` is passed. |
 | `set_edgecuts_width.py` | Normalize `Edge.Cuts` widths; dry-run unless `--write` is passed. |
 
 ## Onshape to FreeCAD
