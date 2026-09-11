@@ -68,7 +68,7 @@ flowchart TB
         direction LR
         F1["fab_export.py · KPY<br/>Fabrication Toolkit → production/"]
         F2["universal_bom.py · KPY<br/>quote_pack.py · KPY"]
-        F3["portal_gerbers.py<br/>gerber_check.py"]
+        F3["portal_gerbers.py<br/>gerber_check.py<br/>cam_compare.py"]
         F4["assembly_drawing.py · KPY"]
         F5["import_part.py · KPY<br/>LCSC via easyeda2kicad"]
         F6["add_mpn_fields.py<br/>set_edgecuts_width.py"]
@@ -160,15 +160,18 @@ flowchart TB
     FT --> PG["portal_gerbers.py<br/>drop drill maps · strip attributes<br/>→ &lt;stem&gt;_portal.zip"]
     PG --> GC["gerber_check.py<br/>min track · min drill · DRC<br/>on the zip the fab receives"]
     GC -->|"pass"| HAND["production/ handoff_pack.py<br/>controlled supplier pack"]
+    HAND -->|"supplier returns"| CAM["fab CAM work Gerbers<br/>flattened panel · fab layer names"]
+    CAM --> CC["cam_compare.py<br/>CAM vs released Gerbers · C1–C7<br/>review workspace · report · questions"]
+    FT -.->|"released set"| CC
 
     classDef input fill:#0c4a6e,stroke:#38bdf8,color:#f8fafc,stroke-width:2px;
     classDef tool fill:#1e293b,stroke:#94a3b8,color:#f8fafc,stroke-width:1.5px;
     classDef gate fill:#27272a,stroke:#f8fafc,color:#f8fafc,stroke-width:2px;
     classDef production fill:#78350f,stroke:#f59e0b,color:#fff7ed,stroke-width:2px;
 
-    class PCB input;
+    class PCB,CAM input;
     class FT,PG tool;
-    class GC gate;
+    class GC,CC gate;
     class HAND production;
 ```
 
