@@ -23,7 +23,9 @@ KPY=/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/
 $KPY hardware/kicad/render_board.py path/to/board.kicad_pcb --outdir images
 ```
 
-Tools that use only the Python standard library run with `python3`. STEP repair
+Tools that use only the Python standard library run with `python3`.
+`cam_compare.py` also needs numpy, scipy, pillow and gerbonara 1.6.3, installed
+without gerbonara's web dependencies: `python3 -m pip install --no-deps gerbonara==1.6.3`. STEP repair
 and post-processing tools additionally require `cadquery-ocp`. Read `--help`
 before using a tool that writes source files; writes are opt-in unless the
 command explicitly says otherwise.
@@ -47,9 +49,26 @@ command explicitly says otherwise.
 | `quote_pack.py` | Assemble generic and supplier-formatted fabrication inputs. |
 | `portal_gerbers.py` | Produce a compatibility copy for limited upload parsers. |
 | `gerber_check.py` | Classify and validate a Gerber archive. |
+| `cam_compare.py` | Compare a fabricator's CAM Gerbers with the released set and review the differences in an interactive workspace with an editable, exportable report. |
 | `assembly_drawing.py` | Render per-side assembly drawings with pin-1 markings. |
 | `import_part.py` | Import an LCSC part into an explicitly selected project library. |
 | `set_edgecuts_width.py` | Normalize `Edge.Cuts` widths; dry-run unless `--write` is passed. |
+
+## Fabricator CAM review
+
+A fab returns its own CAM output ("work" or "working" Gerbers) for
+confirmation: flattened panels, fab layer names, etch and drill compensation,
+removed non-functional pads. `cam_compare.py` locates every board instance in
+that panel from the drill pattern and compares it layer by layer, hole by hole
+and net by net with the released Gerbers, then writes a review workspace:
+
+```sh
+python3 hardware/kicad/cam_compare.py --design release.zip --cam fab_cam.rar -o review/
+python3 hardware/kicad/cam_compare.py --serve -o review/     # edits saved to review/review.json
+```
+
+`review/index.html` also opens directly from disk; edits then stay in that
+browser until exported. `--help` lists the checks and tolerances.
 
 ## Images and CAD exports
 

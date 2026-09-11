@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CAM review</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%23ffd43b%22/%3E%3Cpath d=%22M4 4h8v8H4z%22 fill=%22none%22 stroke=%22%23111%22 stroke-width=%221.5%22/%3E%3C/svg%3E">
+<!-- Template for cam_compare.py. The analysis data replaces the DATA placeholder below; the page
+     works offline from file:// (edits kept in this browser) and from `cam_compare.py --serve`
+     (edits saved to review.json next to it). -->
+<style>
+:root{
+  --bg:#0d0e10;--panel:#15171b;--panel2:#1b1e23;--line:#2a2e35;--fg:#e6e7ea;--mut:#9aa0a8;--dim:#6b717a;
+  --acc:#ffd43b;--fail:#ff5a52;--review:#f5a524;--info:#6aa8ff;--pass:#3fb950;
+  --acc2:#7aa2ff;--design:#e5534b;--cam:#3fb950;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:13px/1.45 var(--sans)}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:4px 9px;cursor:pointer}
+button:hover{border-color:#3a4049}
+button.on{border-color:var(--acc);color:var(--acc)}
+button.primary{background:#2a2410;border-color:#6d5a16;color:var(--acc)}
+input[type=text],input[type=number],textarea,select{background:#0f1114;border:1px solid var(--line);border-radius:5px;padding:4px 7px}
+textarea{width:100%;resize:vertical;min-height:70px}
+.chip{display:inline-block;font:600 10px/1 var(--mono);padding:3px 5px;border-radius:3px;letter-spacing:.03em;vertical-align:1px}
+.s-FAIL{background:#3a1413;color:var(--fail)}.s-REVIEW{background:#3a2a0d;color:var(--review)}
+.s-INFO{background:#122037;color:var(--info)}.s-PASS{background:#12301a;color:var(--pass)}.s-NOTE{background:#2b1f3a;color:#c39bff}
+.d-open{color:var(--mut)}.d-accepted{color:var(--pass)}.d-query{color:var(--review)}.d-rejected{color:var(--fail)}
+.mut{color:var(--mut)}.dim{color:var(--dim)}.mono{font-family:var(--mono)}
+header{height:46px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:14px;margin:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32vw}
+header .sp{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;padding:5px 11px}
+.seg button.on{background:#262a31;color:var(--acc)}
+#save{font:11px var(--mono);color:var(--dim);min-width:120px;text-align:right}
+.menu{position:relative}
+.menu>div{display:none;position:absolute;right:0;top:32px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px;z-index:30;min-width:210px;box-shadow:0 8px 30px #0008}
+.menu.open>div{display:block}
+.menu>div button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:6px 9px}
+.menu>div button:hover{background:#23272e}
+#app{display:grid;height:calc(100vh - 46px);grid-template-columns:320px 1fr 340px;grid-template-areas:"left canvas detail"}
+#app.m-split{grid-template-columns:320px 1fr minmax(420px,44%);grid-template-areas:"left canvas report"}
+#app.m-report{grid-template-columns:320px 1fr;grid-template-areas:"left report"}
+#left{grid-area:left;border-right:1px solid var(--line);background:var(--panel);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+#canvasWrap{grid-area:canvas;position:relative;overflow:hidden;background:#07080a;min-width:0}
+#detail{grid-area:detail;border-left:1px solid var(--line);background:var(--panel);overflow:auto;padding:12px}
+#report{grid-area:report;overflow:auto;background:#101216;border-left:1px solid var(--line);display:none}
+#app.m-split #detail,#app.m-report #detail{display:none}
+#app.m-split #report,#app.m-report #report{display:block}
+#app.m-report #canvasWrap{display:none}
+.hd{font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin:12px 12px 6px}
+#layers{padding:0 8px;max-height:36%;overflow:auto;flex:none}
+.lay{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:5px;cursor:pointer}
+.lay:hover{background:#1e2127}.lay.on{background:#262a31}
+.lay .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#filters{display:flex;flex-wrap:wrap;gap:4px;padding:0 12px 6px}
+#filters input[type=text]{width:100%}
+#filters label{font-size:11px;color:var(--mut);display:inline-flex;align-items:center;gap:3px;margin-right:6px}
+#flist{flex:1;overflow:auto;padding:0 6px 10px;min-height:0}
+.fi{display:grid;grid-template-columns:auto 1fr auto;gap:2px 7px;align-items:start;padding:6px;border-radius:5px;cursor:pointer;border:1px solid transparent}
+.fi:hover{background:#1e2127}.fi.on{background:#262a31;border-color:#3a4049}
+.fi .t{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.fi .sub{grid-column:2/4;font:11px var(--mono);color:var(--dim)}
+.fi input{margin:2px 0 0}
+#bulk{display:none;padding:6px 12px;border-top:1px solid var(--line);gap:4px;flex-wrap:wrap}
+#bulk.show{display:flex}
+canvas#cv{position:absolute;inset:0;width:100%;height:100%;cursor:grab;display:block}
+canvas#cv.drag{cursor:grabbing}canvas#cv.tool{cursor:crosshair}
+#tb{position:absolute;left:10px;top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;z-index:5;max-width:calc(100% - 20px)}
+#tb .grp{background:#15171bee;border:1px solid var(--line);border-radius:7px;padding:3px;display:flex;gap:3px;align-items:center}
+#tb .grp button{background:transparent;border:1px solid transparent;padding:3px 8px}
+#tb .grp button.on{border-color:var(--acc);color:var(--acc)}
+#tb .grp label{font-size:11px;color:var(--mut);display:flex;align-items:center;gap:3px;padding:0 5px;cursor:pointer}
+#hud{position:absolute;left:10px;bottom:10px;max-width:calc(50% - 20px);overflow:hidden;background:#000b;padding:6px 9px;border-radius:5px;font:11px/1.5 var(--mono);white-space:pre;pointer-events:none;z-index:5}
+#legend{position:absolute;right:10px;bottom:10px;max-width:calc(50% - 20px);line-height:1.8;background:#000b;padding:6px 9px;border-radius:5px;font:11px var(--sans);z-index:5}
+#legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 10px;vertical-align:-1px}
+#busy{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#0009;z-index:40;font:13px var(--mono)}
+#busy.show{display:flex}
+#detail h2{font-size:14px;margin:4px 0 8px}
+#detail .kv{display:grid;grid-template-columns:90px 1fr;gap:3px 8px;font-size:12px;margin:8px 0}
+#detail .kv div:nth-child(odd){color:var(--mut)}
+.disp{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0}
+.disp button.on.d-open{border-color:var(--mut)}.disp button.on.d-accepted{border-color:var(--pass);color:var(--pass)}
+.disp button.on.d-query{border-color:var(--review);color:var(--review)}.disp button.on.d-rejected{border-color:var(--fail);color:var(--fail)}
+.snap{max-width:100%;border:1px solid var(--line);border-radius:5px;margin-top:6px;display:block}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
+kbd{font:10px var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;color:var(--mut)}
+/* report document */
+.doc{max-width:900px;margin:0 auto;padding:28px 34px 80px;background:#fbfbf9;color:#1c1d20;min-height:100%;font:14px/1.55 var(--sans)}
+.doc h1{font-size:22px;margin:0 0 4px}.doc h2{font-size:16px;margin:28px 0 8px;border-bottom:1px solid #ddd;padding-bottom:4px}
+.doc h3{font-size:14px;margin:0}
+.doc table{border-collapse:collapse;width:100%;font-size:12.5px}
+.doc td,.doc th{border:1px solid #ddd;padding:4px 7px;text-align:left;vertical-align:top}
+.doc th{background:#f0f0ec}
+.doc [contenteditable]{outline:none;border-radius:3px;min-height:1.4em}
+.doc [contenteditable]:hover{background:#fff7d6}.doc [contenteditable]:focus{background:#fff3c4;box-shadow:0 0 0 2px #f0d070}
+.doc [contenteditable]:empty:before{content:attr(data-ph);color:#9a9a9a}
+.doc .muted{color:#666}.doc .mono{font-family:var(--mono);font-size:12px}
+.doc .card{display:grid;grid-template-columns:200px 1fr;gap:14px;border:1px solid #ddd;border-radius:6px;padding:10px;margin:10px 0;break-inside:avoid;background:#fff}
+.doc .card img{width:200px;height:200px;object-fit:contain;background:#111;border-radius:4px}
+.doc .card .noimg{width:200px;height:60px;display:flex;align-items:center;justify-content:center;background:#eee;border-radius:4px;color:#888;font-size:12px}
+.doc select{background:#fff;color:#111;border:1px solid #bbb}
+.doc .lnk{color:#2456c8;cursor:pointer;font-size:12px;border:0;background:none;padding:0;margin-left:8px}
+.doc .ctrl{font-size:12px;color:#555;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.doc .ctrl button{background:#f2f2ef;border:1px solid #ccc;color:#222}
+.doc .chip{font-size:9.5px}
+.doc .s-FAIL{background:#fde2e1;color:#b3261e}.doc .s-REVIEW{background:#fdf0d5;color:#8a5a00}.doc .s-INFO{background:#e3edff;color:#2456c8}
+.doc .s-PASS{background:#dff3e4;color:#1d7a35}.doc .s-NOTE{background:#efe4ff;color:#6b3fbf}
+.doc .sec{position:relative}
+.doc .sec .secctl{position:absolute;right:0;top:0;display:flex;gap:4px}
+.doc .sec .secctl button{font-size:11px;padding:1px 6px;background:#f2f2ef;border:1px solid #ccc;color:#333}
+.decision{font-weight:600}
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:360px}
+dialog::backdrop{background:#0009}
+dialog .kv{display:grid;grid-template-columns:1fr 110px;gap:6px 10px;align-items:center;margin:10px 0}
+@media print{
+  header,#left,#canvasWrap,#detail,.noprint,.secctl,.lnk,.ctrl button{display:none !important}
+  #app{display:block;height:auto}
+  #report{display:block !important;border:0;overflow:visible;background:#fff}
+  .doc{padding:0;max-width:none}
+  .doc [contenteditable]:empty{display:none}
+  .doc [contenteditable]{background:none !important;box-shadow:none !important}
+  .doc select{border:0;appearance:none;-webkit-appearance:none;padding:0;font-weight:600}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">CAM review</h1>
+  <span id="overall" class="chip"></span>
+  <div class="seg" id="modes"><button data-m="analyse" class="on" title="A">Analyse</button><button data-m="split" title="S">Split</button><button data-m="report" title="R">Report</button></div>
+  <span class="sp"></span>
+  <span id="save">not saved</span>
+  <button id="rerunBtn" style="display:none" title="Re-run the analysis with new parameters">Re-run</button>
+  <div class="menu" id="exportMenu"><button>Export ▾</button><div>
+    <button data-x="pdf">Print / save as PDF</button>
+    <button data-x="html">Report as HTML file</button>
+    <button data-x="md">Report as Markdown</button>
+    <button data-x="eq">Engineering questions (CSV)</button>
+    <button data-x="json">Review state (JSON)</button>
+    <button data-x="import">Import review state…</button>
+  </div></div>
+  <button id="helpBtn" title="Keyboard shortcuts">?</button>
+</header>
+<div id="app">
+  <aside id="left">
+    <div class="hd">Layers</div>
+    <div id="layers"></div>
+    <div class="hd">Findings <span id="fcount" class="mut"></span></div>
+    <div id="filters">
+      <input type="text" id="q" placeholder="Search findings  ( / )">
+      <label><input type="checkbox" data-st="FAIL" checked>fail</label>
+      <label><input type="checkbox" data-st="REVIEW" checked>review</label>
+      <label><input type="checkbox" data-st="INFO">info</label>
+      <label><input type="checkbox" data-st="NOTE" checked>notes</label>
+      <select id="fdisp"><option value="">any disposition</option><option value="open">open</option><option value="accepted">accepted</option><option value="query">query fab</option><option value="rejected">rejected</option></select>
+      <select id="flayer"><option value="">all layers</option></select>
+    </div>
+    <div id="flist"></div>
+    <div id="bulk"><span class="mut" id="bulkN"></span>
+      <button data-bd="accepted">Accept</button><button data-bd="query">Query</button><button data-bd="rejected">Reject</button><button data-bd="open">Reopen</button>
+      <button data-bi="1">In report</button><button data-bi="0">Out</button><button id="bulkClear">Clear</button></div>
+  </aside>
+  <main id="canvasWrap">
+    <canvas id="cv"></canvas>
+    <div id="tb">
+      <div class="grp" id="vmodes"><button data-v="overlay" class="on" title="design and CAM overlaid">Overlay</button><button data-v="design">Design</button><button data-v="cam">CAM</button><button data-v="flag" title="only differences beyond tolerance">Flagged</button><button data-v="panel" title="whole CAM panel">Panel</button></div>
+      <div class="grp"><label><input type="checkbox" id="o_outline" checked>outline</label><label><input type="checkbox" id="o_band">edge band</label><label><input type="checkbox" id="o_hd">design holes</label><label><input type="checkbox" id="o_hc">CAM holes</label><label><input type="checkbox" id="o_mk" checked>markers</label></div>
+      <div class="grp"><button id="t_measure" title="M">Measure</button><button id="t_note" title="N">Add note</button><button id="t_fit" title="F">Fit</button></div>
+    </div>
+    <div id="hud"></div>
+    <div id="legend"></div>
+    <div id="busy">working…</div>
+  </main>
+  <aside id="detail"></aside>
+  <section id="report"></section>
+</div>
+<dialog id="rerunDlg"><h3 style="margin:0">Re-run analysis</h3>
+  <p class="mut" style="margin:6px 0">Runs cam_compare on the recorded inputs. Review edits are kept; findings keep their dispositions when they reappear at the same place.</p>
+  <div class="kv" id="rerunKv"></div>
+  <div class="row" style="justify-content:flex-end"><button id="rerunCancel">Cancel</button><button class="primary" id="rerunGo">Run</button></div>
+</dialog>
+<dialog id="helpDlg"><h3 style="margin:0 0 8px">Keyboard</h3>
+  <div class="mono" style="font-size:12px;line-height:1.9">
+  <kbd>A</kbd> <kbd>S</kbd> <kbd>R</kbd> analyse / split / report<br>
+  <kbd>J</kbd> <kbd>K</kbd> next / previous finding<br>
+  <kbd>1</kbd> accept <kbd>2</kbd> query fab <kbd>3</kbd> reject <kbd>0</kbd> reopen<br>
+  <kbd>I</kbd> toggle "in report"<br>
+  <kbd>F</kbd> fit <kbd>M</kbd> measure <kbd>N</kbd> add note <kbd>Esc</kbd> cancel tool<br>
+  <kbd>V</kbd> cycle view mode <kbd>[</kbd> <kbd>]</kbd> previous / next layer<br>
+  <kbd>/</kbd> search <kbd>Ctrl/⌘ P</kbd> print report
+  </div>
+  <div class="row" style="justify-content:flex-end"><button onclick="helpDlg.close()">Close</button></div>
+</dialog>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+<script>
+'use strict';
+const DATA = /*__DATA__*/null;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const META = DATA.meta, VIEW = DATA.view;
+const CHECKS = {C1: 'Layer set', C2: 'Placement', C3: 'Drills', C4: 'Geometry', C5: 'Inner layer order', C6: 'Connectivity', C7: 'Panel consistency', NOTE: 'Reviewer note'};
+const DISP = {open: 'Open', accepted: 'Accepted', query: 'Query fab', rejected: 'Rejected'};
+const boardName = (() => { const b = (META.design || '').split('/').pop().replace(/\.(zip|rar|7z|tgz)$/i, ''); return b || 'board'; })();
+const DATA_ID = (META.design_sha256 || '').slice(0, 12) + '-' + (META.cam_sha256 || '').slice(0, 12);
+
+/* ------------------------------------------------------------------ state */
+const DEFAULT = () => ({version: 1, data_id: DATA_ID, findings: {}, notes: [], report: {
+  title: `${boardName}: fabricator CAM review`, fields: {supplier: '', order: '', reviewer: '', date: new Date().toISOString().slice(0, 10)},
+  decision: '', summary: '', conclusion: '', eqIntro: '', checkNotes: {}, sections: [], groupBy: 'disposition'}, updated: null});
+let S = DEFAULT();
+let serverMode = location.protocol.startsWith('http');
+let saveTimer = null;
+function setSave(t) { $('#save').textContent = t; }
+function save() {
+  S.updated = new Date().toISOString();
+  clearTimeout(saveTimer);
+  setSave('saving…');
+  saveTimer = setTimeout(async () => {
+    try { localStorage.setItem('camreview:' + DATA_ID, JSON.stringify(S)); } catch (e) {}
+    if (serverMode) {
+      try {
+        const r = await fetch('review.json', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(S, null, 1)});
+        if (!r.ok) throw new Error(r.status);
+        setSave('saved to review.json ' + new Date().toLocaleTimeString());
+      } catch (e) { serverMode = false; setSave('saved in this browser'); }
+    } else setSave('saved in this browser ' + new Date().toLocaleTimeString());
+  }, 400);
+}
+function merge(base, add) { for (const k in add) { if (add[k] && typeof add[k] === 'object' && !Array.isArray(add[k]) && base[k] && typeof base[k] === 'object') merge(base[k], add[k]); else base[k] = add[k]; } return base; }
+async function loadState() {
+  let got = null;
+  if (serverMode) { try { const r = await fetch('review.json', {cache: 'no-store'}); if (r.ok) got = await r.json(); } catch (e) {} }
+  if (!got) { try { got = JSON.parse(localStorage.getItem('camreview:' + DATA_ID) || 'null'); } catch (e) {} }
+  if (got) S = merge(DEFAULT(), got);
+  setSave(got ? (serverMode ? 'loaded review.json' : 'loaded from this browser') : (serverMode ? 'new review (review.json)' : 'new review (browser storage)'));
+}
+
+/* ------------------------------------------------------------------ findings model */
+const AUTO = DATA.findings;
+function fstate(f) {
+  if (!S.findings[f.id]) S.findings[f.id] = {};
+  const st = S.findings[f.id];
+  if (st.disposition === undefined) st.disposition = 'open';
+  if (st.include === undefined) st.include = f.status !== 'INFO';
+  return st;
+}
+function allFindings() {
+  return AUTO.concat(S.notes.map(n => ({...n, check: 'NOTE', status: 'NOTE', note: true})));
+}
+function fget(id) { return allFindings().find(f => f.id === id); }
+function ftitle(f) { const st = f.note ? f : fstate(f); return (st.title_override ?? '') || f.title; }
+function fstatusOf(f) { return f.note ? 'NOTE' : f.status; }
+
+/* ------------------------------------------------------------------ masks and composition */
+const G = VIEW && VIEW.grid, PG = VIEW && VIEW.pgrid;
+const maskCache = new Map();
+async function decodeMask(b64, w, h) {
+  if (maskCache.has(b64)) return maskCache.get(b64);
+  const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
+  const bmp = await createImageBitmap(blob);
+  const c = new OffscreenCanvas(bmp.width, bmp.height), x = c.getContext('2d');
+  x.drawImage(bmp, 0, 0);
+  const px = x.getImageData(0, 0, bmp.width, bmp.height).data, out = new Uint8Array(bmp.width * bmp.height);
+  for (let i = 0, j = 0; i < out.length; i++, j += 4) out[i] = px[j] > 127 ? 1 : 0;
+  const m = {w: bmp.width, h: bmp.height, a: out};
+  maskCache.set(b64, m);
+  return m;
+}
+const layerByKey = k => VIEW.layers.find(L => L.key === k);
+const compCache = new Map();
+async function composeBoard(key, mode) {
+  const showOutline = $('#o_outline').checked, ck = key + '|' + mode + '|' + showOutline;
+  if (compCache.has(ck)) return compCache.get(ck);
+  const L = layerByKey(key);
+  const [d, c, f, reg, out] = await Promise.all([decodeMask(L.design), decodeMask(L.cam), decodeMask(L.flag), decodeMask(VIEW.region), decodeMask(VIEW.outline)]);
+  const n = d.w * d.h, img = new ImageData(d.w, d.h), p = img.data;
+  const set = (i, r, g, b, a = 255) => { const j = i * 4; p[j] = r; p[j + 1] = g; p[j + 2] = b; p[j + 3] = a; };
+  for (let i = 0; i < n; i++) {
+    const D = d.a[i], C = c.a[i], F = f.a[i], inB = reg.a[i];
+    if (mode === 'overlay') {
+      if (D && C) set(i, 150, 152, 158);
+      else if (D) F ? set(i, 255, 72, 64) : set(i, 122, 44, 40);
+      else if (C) F ? set(i, 70, 230, 110) : set(i, 36, 96, 52);
+      else set(i, inB ? 24 : 10, inB ? 26 : 11, inB ? 32 : 13);
+    } else if (mode === 'design') { D ? set(i, 205, 206, 210) : set(i, inB ? 24 : 10, inB ? 26 : 11, inB ? 32 : 13); }
+    else if (mode === 'cam') { C ? set(i, 205, 206, 210) : set(i, inB ? 24 : 10, inB ? 26 : 11, inB ? 32 : 13); }
+    else if (mode === 'flag') {
+      if (F) D ? set(i, 255, 72, 64) : set(i, 70, 230, 110);
+      else if (D || C) set(i, 58, 60, 66); else set(i, inB ? 24 : 10, inB ? 26 : 11, inB ? 32 : 13);
+    }
+    if (showOutline && out.a[i]) set(i, 255, 212, 59, 200);
+  }
+  const bmp = await createImageBitmap(img);
+  compCache.set(ck, bmp);
+  return bmp;
+}
+async function composePanel(key) {
+  const ck = 'panel|' + key;
+  if (compCache.has(ck)) return compCache.get(ck);
+  const m = await decodeMask(VIEW.panel[key]);
+  const img = new ImageData(m.w, m.h), p = img.data;
+  for (let i = 0, j = 0; i < m.a.length; i++, j += 4) { const v = m.a[i]; p[j] = v ? 190 : 14; p[j + 1] = v ? 192 : 15; p[j + 2] = v ? 198 : 18; p[j + 3] = 255; }
+  const bmp = await createImageBitmap(img);
+  compCache.set(ck, bmp);
+  return bmp;
+}
+let bandBmp = null;
+async function bandBitmap() {
+  if (bandBmp) return bandBmp;
+  const m = await decodeMask(VIEW.band); const img = new ImageData(m.w, m.h), p = img.data;
+  for (let i = 0, j = 0; i < m.a.length; i++, j += 4) if (m.a[i]) { p[j] = 122; p[j + 1] = 162; p[j + 2] = 255; p[j + 3] = 60; }
+  return bandBmp = await createImageBitmap(img);
+}
+
+/* ------------------------------------------------------------------ canvas view */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+const V = {layer: VIEW ? VIEW.layers[0].key : null, mode: 'overlay', cx: 0, cy: 0, scale: 10, tool: null, meas: [], sel: null, checked: new Set(), hover: null};
+function inst(k) { const o = META.instances.offsets[k - 1], M = META.instances.matrix; return (x, y) => [M[0][0] * x + M[0][1] * y + o[0], M[1][0] * x + M[1][1] * y + o[1]]; }
+function fit() {
+  const r = cv.getBoundingClientRect();
+  if (V.mode === 'panel') {
+    const w = PG.w * PG.res, h = PG.h * PG.res;
+    V.cx = PG.x0 + w / 2; V.cy = PG.y1 - h / 2; V.scale = Math.min(r.width / w, r.height / h) * 0.95;
+  } else {
+    const [x0, y0, x1, y1] = VIEW.board;
+    V.cx = (x0 + x1) / 2; V.cy = (y0 + y1) / 2; V.scale = Math.min(r.width / (x1 - x0), r.height / (y1 - y0)) * 0.9;
+  }
+  draw();
+}
+const toS = (x, y) => { const r = cv.getBoundingClientRect(); return [(x - V.cx) * V.scale + r.width / 2, (V.cy - y) * V.scale + r.height / 2]; };
+const toW = (sx, sy) => { const r = cv.getBoundingClientRect(); return [(sx - r.width / 2) / V.scale + V.cx, V.cy - (sy - r.height / 2) / V.scale]; };
+function resize() { const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); ctx.setTransform(d, 0, 0, d, 0, 0); draw(); }
+let drawToken = 0;
+async function draw() {
+  if (!VIEW || !cv.width) return;
+  const tok = ++drawToken, r = cv.getBoundingClientRect();
+  const bmp = V.mode === 'panel' ? await composePanel(V.layer) : await composeBoard(V.layer, V.mode);
+  const band = !V.mode.startsWith('panel') && $('#o_band').checked ? await bandBitmap() : null;
+  if (tok !== drawToken) return;
+  ctx.fillStyle = '#07080a'; ctx.fillRect(0, 0, r.width, r.height);
+  ctx.imageSmoothingEnabled = V.scale * (V.mode === 'panel' ? PG.res : G.res) < 1.5;
+  const g = V.mode === 'panel' ? PG : G;
+  const [sx, sy] = toS(g.x0, g.y1);
+  ctx.drawImage(bmp, sx, sy, g.w * g.res * V.scale, g.h * g.res * V.scale);
+  if (band) ctx.drawImage(band, sx, sy, g.w * g.res * V.scale, g.h * g.res * V.scale);
+  if (V.mode === 'panel') drawPanelOverlay(); else drawBoardOverlay();
+  drawMeasure();
+  legend();
+}
+function drawBoardOverlay() {
+  if ($('#o_hd').checked) for (const [x, y, d, pl] of VIEW.holes.design) circle(x, y, d / 2, pl === 0 ? '#ffd43b' : '#ffffffcc', []);
+  if ($('#o_hc').checked) for (const [x, y, d] of VIEW.holes.cam) circle(x, y, d / 2, '#3fd0ff', [3, 3]);
+  if ($('#o_mk').checked) for (const f of visibleFindings()) {
+    if (f.x == null || f.instance) continue;
+    if (!(f.layer === V.layer || f.layer === 'drill' || f.note || !f.layer)) continue;
+    marker(f, f.x, f.y, f.w, f.h);
+  }
+}
+function drawPanelOverlay() {
+  const [x0, y0, x1, y1] = VIEW.board;
+  ctx.font = '600 12px ' + getComputedStyle(document.body).fontFamily;
+  META.instances.offsets.forEach((o, k) => {
+    const T = inst(k + 1), c = [T(x0, y0), T(x1, y0), T(x1, y1), T(x0, y1)].map(p => toS(...p));
+    ctx.strokeStyle = '#ffd43b88'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.beginPath(); c.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = '#ffd43b'; const m = c.reduce((a, p) => [a[0] + p[0] / 4, a[1] + p[1] / 4], [0, 0]); ctx.fillText(String(k + 1), m[0] - 4, m[1] + 4);
+  });
+  if ($('#o_mk').checked) for (const f of visibleFindings()) {
+    if (f.x == null) continue;
+    const ks = f.instance ? [f.instance] : [1];
+    for (const k of ks) { const [X, Y] = inst(k)(f.x, f.y); marker(f, X, Y, f.w, f.h); }
+  }
+}
+const SCOL = {FAIL: '#ff5a52', REVIEW: '#f5a524', INFO: '#6aa8ff', NOTE: '#c39bff'};
+function marker(f, x, y, w, h) {
+  const st = f.note ? f : fstate(f), sel = V.sel === f.id;
+  const [sx, sy] = toS(x, y);
+  const hw = Math.max((w || 0) * V.scale / 2 + 4, 6), hh = Math.max((h || 0) * V.scale / 2 + 4, 6);
+  ctx.setLineDash(st.disposition === 'accepted' ? [4, 3] : []);
+  ctx.lineWidth = sel ? 3 : 1.5; ctx.strokeStyle = SCOL[fstatusOf(f)] || '#fff';
+  ctx.globalAlpha = st.disposition === 'accepted' && !sel ? 0.55 : 1;
+  ctx.strokeRect(sx - hw, sy - hh, hw * 2, hh * 2);
+  if (f.note) { ctx.fillStyle = SCOL.NOTE; ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1; ctx.setLineDash([]);
+}
+function circle(x, y, r, col, dash) { const [sx, sy] = toS(x, y); ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.arc(sx, sy, Math.max(r * V.scale, 1.5), 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+function drawMeasure() {
+  if (!V.meas.length) return;
+  const pts = V.meas.map(p => toS(...p));
+  ctx.strokeStyle = '#ffd43b'; ctx.fillStyle = '#ffd43b'; ctx.lineWidth = 1.5;
+  pts.forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, 7); ctx.stroke(); });
+  if (pts.length === 2) { ctx.beginPath(); ctx.moveTo(...pts[0]); ctx.lineTo(...pts[1]); ctx.stroke(); }
+}
+function legend() {
+  const m = V.mode, el = $('#legend');
+  if (m === 'overlay') el.innerHTML = '<i style="background:#96989e"></i>both<i style="background:#ff4840"></i>design only<i style="background:#46e66e"></i>CAM only<i style="background:#7a2c28"></i><i style="background:#246034;margin-left:0"></i>within tolerance / not flagged';
+  else if (m === 'flag') el.innerHTML = '<i style="background:#ff4840"></i>removed in CAM<i style="background:#46e66e"></i>added in CAM<span class="dim"> beyond tolerance, board interior</span>';
+  else if (m === 'panel') el.innerHTML = 'CAM panel, <b>' + esc(V.layer) + '</b>; boxes are the board instances found from the drill pattern';
+  else el.innerHTML = (m === 'design' ? 'design ' : 'CAM ') + esc(m === 'design' ? layerByKey(V.layer).design_file : layerByKey(V.layer).cam_file);
+}
+function hud(ev) {
+  if (!VIEW) return;
+  const r = cv.getBoundingClientRect(), [x, y] = toW(ev.clientX - r.left, ev.clientY - r.top);
+  let t = (V.mode === 'panel' ? 'CAM ' : 'design ') + `x ${x.toFixed(3)}  y ${y.toFixed(3)} mm   ${V.scale.toFixed(1)} px/mm`;
+  if (V.meas.length === 2) { const [a, b] = V.meas, dx = b[0] - a[0], dy = b[1] - a[1]; t += `\nmeasure  d ${Math.hypot(dx, dy).toFixed(3)}  dx ${Math.abs(dx).toFixed(3)}  dy ${Math.abs(dy).toFixed(3)} mm`; }
+  if (V.tool === 'measure') t += '\nmeasure: click two points (Esc ends)';
+  if (V.tool === 'note') t += '\nadd note: click a point or drag a box (Esc cancels)';
+  $('#hud').textContent = t;
+}
+let drag = null;
+cv.addEventListener('pointerdown', ev => {
+  const r = cv.getBoundingClientRect(), p = toW(ev.clientX - r.left, ev.clientY - r.top);
+  if (V.tool === 'measure') { V.meas = V.meas.length >= 2 ? [p] : [...V.meas, p]; draw(); hud(ev); return; }
+  drag = {x: ev.clientX, y: ev.clientY, cx: V.cx, cy: V.cy, start: p, moved: false};
+  cv.setPointerCapture(ev.pointerId);
+  if (!V.tool) cv.classList.add('drag');
+});
+cv.addEventListener('pointermove', ev => {
+  hud(ev);
+  if (!drag) return;
+  if (Math.abs(ev.clientX - drag.x) + Math.abs(ev.clientY - drag.y) > 3) drag.moved = true;
+  if (V.tool === 'note') { draw().then(() => { const r = cv.getBoundingClientRect(), [a, b] = toS(...drag.start); ctx.strokeStyle = SCOL.NOTE; ctx.setLineDash([4, 3]); ctx.strokeRect(a, b, ev.clientX - r.left - a, ev.clientY - r.top - b); ctx.setLineDash([]); }); return; }
+  V.cx = drag.cx - (ev.clientX - drag.x) / V.scale; V.cy = drag.cy + (ev.clientY - drag.y) / V.scale; draw();
+});
+cv.addEventListener('pointerup', ev => {
+  cv.classList.remove('drag');
+  if (!drag) return;
+  const r = cv.getBoundingClientRect(), p = toW(ev.clientX - r.left, ev.clientY - r.top), d = drag; drag = null;
+  if (V.tool === 'note') { addNote(d.start, p, d.moved); return; }
+  if (!d.moved) pickAt(ev.clientX - r.left, ev.clientY - r.top);
+});
+cv.addEventListener('wheel', ev => {
+  ev.preventDefault();
+  const r = cv.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top, [x, y] = toW(mx, my);
+  V.scale = Math.min(Math.max(V.scale * Math.exp(-ev.deltaY * 0.0015), 0.3), 2000);
+  V.cx = x - (mx - r.width / 2) / V.scale; V.cy = y + (my - r.height / 2) / V.scale;
+  draw(); hud(ev);
+}, {passive: false});
+function pickAt(sx, sy) {
+  let best = null, bd = 1e9;
+  for (const f of visibleFindings()) {
+    if (f.x == null) continue;
+    let X = f.x, Y = f.y;
+    if (V.mode === 'panel') [X, Y] = inst(f.instance || 1)(f.x, f.y);
+    else if (f.instance || !(f.layer === V.layer || f.layer === 'drill' || f.note || !f.layer)) continue;
+    const [a, b] = toS(X, Y), hw = Math.max((f.w || 0) * V.scale / 2 + 6, 8), hh = Math.max((f.h || 0) * V.scale / 2 + 6, 8);
+    if (Math.abs(sx - a) <= hw && Math.abs(sy - b) <= hh) { const dd = Math.hypot(sx - a, sy - b); if (dd < bd) { bd = dd; best = f; } }
+  }
+  if (best) select(best.id, false);
+}
+function setTool(t) { V.tool = V.tool === t ? null : t; if (V.tool !== 'measure') V.meas = []; cv.classList.toggle('tool', !!V.tool); $('#t_measure').classList.toggle('on', V.tool === 'measure'); $('#t_note').classList.toggle('on', V.tool === 'note'); draw(); }
+function addNote(a, b, box) {
+  const n = S.notes.length ? Math.max(...S.notes.map(n => +n.id.slice(5) || 0)) + 1 : 1;
+  const x = box ? (a[0] + b[0]) / 2 : a[0], y = box ? (a[1] + b[1]) / 2 : a[1];
+  const note = {id: 'NOTE-' + n, layer: V.mode === 'panel' ? '' : V.layer, x, y, w: box ? Math.abs(b[0] - a[0]) : 0, h: box ? Math.abs(b[1] - a[1]) : 0,
+    title: 'Reviewer note', comment: '', disposition: 'query', include: true, created: new Date().toISOString()};
+  if (V.mode === 'panel') { const M = META.instances.matrix, o = META.instances.offsets[0], det = M[0][0] * M[1][1] - M[0][1] * M[1][0];
+    const px = note.x - o[0], py = note.y - o[1]; note.x = (M[1][1] * px - M[0][1] * py) / det; note.y = (-M[1][0] * px + M[0][0] * py) / det; }
+  S.notes.push(note); save(); setTool(null); renderList(); select(note.id, false);
+  setTimeout(() => { const i = $('#detail input[data-k=title]'); if (i) { i.focus(); i.select(); } }, 30);
+}
+
+/* ------------------------------------------------------------------ layers and list */
+function renderLayers() {
+  if (!VIEW) { $('#layers').innerHTML = '<div class="mut" style="padding:6px">No board view: the board was not located in the CAM data.</div>'; return; }
+  $('#layers').innerHTML = VIEW.layers.map(L => `<div class="lay${L.key === V.layer ? ' on' : ''}" data-k="${esc(L.key)}" title="${esc(L.design_file)} vs ${esc(L.cam_file)}&#10;edge offset ${L.stats.edge_offset} mm&#10;removed ${L.stats.removed}, added ${L.stats.added}${L.stats.pads_removed ? '&#10;' + L.stats.pads_removed + ' hole pads removed' : ''}">
+    <span class="chip s-${L.status}">${L.status}</span><span class="nm">${esc(L.key)}</span><span class="dim mono">${L.stats.removed + L.stats.added || ''}</span></div>`).join('');
+  $$('.lay').forEach(el => el.onclick = () => setLayer(el.dataset.k));
+  const fl = $('#flayer'); if (fl.options.length === 1) VIEW.layers.forEach(L => fl.add(new Option(L.key, L.key))), fl.add(new Option('drill', 'drill'));
+}
+function setLayer(k) { V.layer = k; renderLayers(); draw(); }
+function visibleFindings() {
+  const sts = new Set($$('#filters input[data-st]').filter(i => i.checked).map(i => i.dataset.st));
+  const q = $('#q').value.trim().toLowerCase(), dp = $('#fdisp').value, ly = $('#flayer').value;
+  return allFindings().filter(f => {
+    const st = f.note ? f : fstate(f);
+    if (!sts.has(fstatusOf(f))) return false;
+    if (dp && st.disposition !== dp) return false;
+    if (ly && f.layer !== ly) return false;
+    if (q && !(ftitle(f) + ' ' + f.id + ' ' + (st.comment || '') + ' ' + (f.layer || '')).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function renderList() {
+  const fs = visibleFindings(), all = allFindings();
+  $('#fcount').textContent = `${fs.length} / ${all.length}`;
+  $('#flist').innerHTML = fs.map(f => {
+    const st = f.note ? f : fstate(f);
+    return `<div class="fi${V.sel === f.id ? ' on' : ''}" data-id="${esc(f.id)}"><input type="checkbox" ${V.checked.has(f.id) ? 'checked' : ''} title="select for bulk action">
+      <div class="t"><span class="chip s-${fstatusOf(f)}">${fstatusOf(f)}</span> ${esc(ftitle(f))}</div>
+      <span class="d-${st.disposition} mono" style="font-size:11px">${DISP[st.disposition]}${st.include ? '' : ' ·out'}</span>
+      <div class="sub">${esc(f.id)} · ${esc(CHECKS[f.check] || f.check)}${f.layer ? ' · ' + esc(f.layer) : ''}${f.x != null ? ` · (${f.x.toFixed(2)}, ${f.y.toFixed(2)})` : ''}${f.instance ? ' · inst ' + f.instance : ''}</div></div>`;
+  }).join('') || '<div class="mut" style="padding:10px">No findings match the filters.</div>';
+  $$('.fi').forEach(el => {
+    el.onclick = ev => { if (ev.target.type === 'checkbox') { ev.target.checked ? V.checked.add(el.dataset.id) : V.checked.delete(el.dataset.id); bulkBar(); return; } select(el.dataset.id, true); };
+  });
+  bulkBar();
+}
+function bulkBar() { $('#bulk').classList.toggle('show', V.checked.size > 0); $('#bulkN').textContent = V.checked.size + ' selected'; }
+$$('#bulk [data-bd]').forEach(b => b.onclick = () => { V.checked.forEach(id => { const f = fget(id); if (f) (f.note ? f : fstate(f)).disposition = b.dataset.bd; }); save(); refreshAll(); });
+$$('#bulk [data-bi]').forEach(b => b.onclick = () => { V.checked.forEach(id => { const f = fget(id); if (f) (f.note ? f : fstate(f)).include = b.dataset.bi === '1'; }); save(); refreshAll(); });
+$('#bulkClear').onclick = () => { V.checked.clear(); renderList(); };
+['#q', '#fdisp', '#flayer'].forEach(s => $(s).addEventListener('input', () => { renderList(); draw(); }));
+$$('#filters input[data-st]').forEach(i => i.onchange = () => { renderList(); draw(); });
+
+/* ------------------------------------------------------------------ selection and detail */
+function select(id, zoom) {
+  const f = fget(id); if (!f) return;
+  V.sel = id;
+  if (VIEW && f.x != null) {
+    if (f.instance) { if (V.mode !== 'panel') setMode('panel'); }
+    else if (V.mode === 'panel') setMode('overlay');
+    if (f.layer && layerByKey(f.layer)) V.layer = f.layer;
+    if (zoom || !onScreen(f)) {
+      const r = cv.getBoundingClientRect(), span = Math.max(f.w || 0, f.h || 0, 0.8) * 4;
+      const [X, Y] = V.mode === 'panel' ? inst(f.instance || 1)(f.x, f.y) : [f.x, f.y];
+      V.cx = X; V.cy = Y; if (r.width) V.scale = Math.min(r.width, r.height) / Math.max(span, 3);
+    }
+  }
+  renderLayers(); renderList(); renderDetail(); draw();
+  const el = $(`.fi[data-id="${CSS.escape(id)}"]`); if (el) el.scrollIntoView({block: 'nearest'});
+  if (!$('#app').classList.contains('m-analyse')) { const c = $(`#report [data-card="${CSS.escape(id)}"]`); if (c) { c.scrollIntoView({block: 'center', behavior: 'smooth'}); c.style.boxShadow = '0 0 0 3px #f0d070'; setTimeout(() => c.style.boxShadow = '', 1200); } }
+}
+function onScreen(f) { const r = cv.getBoundingClientRect(), [a, b] = toS(f.x, f.y); return a > 0 && b > 0 && a < r.width && b < r.height; }
+function renderDetail() {
+  const el = $('#detail'), f = V.sel && fget(V.sel);
+  if (!f) {
+    el.innerHTML = `<h2>${esc(boardName)}</h2><div class="kv">${[['CAM', (META.cam || '').split('/').pop()], ['design', (META.design || '').split('/').pop()],
+      ['instances', META.instances ? `${META.instances.count} (${META.instances.columns} x ${META.instances.rows}), rot ${META.instances.rotation}${META.instances.mirrored ? ', mirrored' : ''}` : '-'],
+      ['tool', META.tool_revision], ['tolerance', META.params.tol + ' mm'], ['failing', DATA.fails]].map(([k, v]) => `<div>${k}</div><div class="mono">${esc(v)}</div>`).join('')}</div>
+      <p class="mut">Select a finding in the list or click a marker. <kbd>J</kbd>/<kbd>K</kbd> step through findings; <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> set the disposition.</p>
+      <div class="hd" style="margin:14px 0 6px">Automated results</div><div class="mono" style="font-size:11px;white-space:pre-wrap;color:var(--mut)">${esc(DATA.lines.join('\n'))}</div>`;
+    return;
+  }
+  const st = f.note ? f : fstate(f);
+  el.innerHTML = `<div class="row"><span class="chip s-${fstatusOf(f)}">${fstatusOf(f)}</span><span class="mono dim">${esc(f.id)}</span><span class="sp" style="flex:1"></span><button id="toReport">Show in report</button></div>
+    <input type="text" data-k="title" value="${esc(ftitle(f))}" style="width:100%;font-weight:600;margin:6px 0">
+    <div class="kv">
+      <div>check</div><div>${esc(CHECKS[f.check] || f.check)}</div>
+      <div>layer</div><div>${f.note ? `<select data-k="layer"><option value="">(none)</option>${VIEW ? VIEW.layers.map(L => `<option ${L.key === f.layer ? 'selected' : ''}>${esc(L.key)}</option>`).join('') : ''}</select>` : esc(f.layer || '-')}</div>
+      ${f.x != null ? `<div>location</div><div class="mono">(${f.x.toFixed(3)}, ${f.y.toFixed(3)}) mm${f.w ? `<br>${f.w.toFixed(2)} x ${f.h.toFixed(2)} mm` : ''}${f.instance ? '<br>panel instance ' + f.instance : ''}</div>` : ''}
+      ${f.area ? `<div>area</div><div class="mono">${f.area} mm²</div>` : ''}
+      ${f.detail ? `<div>detail</div><div>${esc(f.detail)}</div>` : ''}
+      ${f.title !== ftitle(f) && !f.note ? `<div>original</div><div class="dim">${esc(f.title)}</div>` : ''}
+    </div>
+    <div class="disp">${Object.entries(DISP).map(([k, v]) => `<button data-d="${k}" class="d-${k}${st.disposition === k ? ' on' : ''}">${v}</button>`).join('')}</div>
+    <label class="row"><input type="checkbox" data-k="include" ${st.include ? 'checked' : ''}> include in report</label>
+    <textarea data-k="comment" placeholder="Comment or question for the fab…">${esc(st.comment || '')}</textarea>
+    <div class="row"><button id="snapBtn">Attach current view</button>${st.snapshot ? '<button id="snapDel">Remove image</button>' : ''}${f.note ? '<button id="noteDel">Delete note</button>' : ''}</div>
+    ${st.snapshot ? `<img class="snap" src="${st.snapshot}">` : '<div class="dim" style="font-size:11px">The report uses an automatic crop unless you attach a view.</div>'}`;
+  const T = el;
+  $$('[data-k]', T).forEach(inp => inp.addEventListener(inp.type === 'checkbox' ? 'change' : 'input', () => {
+    const k = inp.dataset.k, v = inp.type === 'checkbox' ? inp.checked : inp.value;
+    if (k === 'title') { if (f.note) f.title = v, S.notes.find(n => n.id === f.id).title = v; else st.title_override = v === f.title ? '' : v; }
+    else if (k === 'layer') S.notes.find(n => n.id === f.id).layer = v;
+    else { st[k] = v; if (f.note) S.notes.find(n => n.id === f.id)[k] = v; }
+    save(); renderList(); if (k !== 'comment' && k !== 'title') draw(); scheduleReport();
+  }));
+  $$('.disp button', T).forEach(b => b.onclick = () => setDisp(f, b.dataset.d));
+  $('#toReport', T).onclick = () => { if ($('#app').classList.contains('m-analyse')) setView('split'); select(f.id, false); };
+  $('#snapBtn', T).onclick = () => { const s = snapshot(); (f.note ? S.notes.find(n => n.id === f.id) : st).snapshot = s; save(); renderDetail(); scheduleReport(); };
+  if ($('#snapDel', T)) $('#snapDel', T).onclick = () => { delete (f.note ? S.notes.find(n => n.id === f.id) : st).snapshot; save(); renderDetail(); scheduleReport(); };
+  if ($('#noteDel', T)) $('#noteDel', T).onclick = () => { S.notes = S.notes.filter(n => n.id !== f.id); V.sel = null; save(); refreshAll(); };
+}
+function setDisp(f, d) { const st = f.note ? S.notes.find(n => n.id === f.id) : fstate(f); st.disposition = d; save(); refreshAll(); }
+function snapshot() {
+  const w = cv.width, h = cv.height, k = Math.min(1, 900 / Math.max(w, h)), c = document.createElement('canvas');
+  c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(cv, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+
+/* ------------------------------------------------------------------ automatic crops */
+const cropCache = new Map();
+async function crop(f) {
+  const st = f.note ? f : fstate(f);
+  if (st.snapshot) return st.snapshot;
+  if (!VIEW || f.x == null) return null;
+  const key = f.id + '|' + (f.layer || '') + '|' + f.x + f.y;
+  if (cropCache.has(key)) return cropCache.get(key);
+  const layer = layerByKey(f.layer) ? f.layer : VIEW.layers[0].key, N = 400;
+  const half = Math.max(Math.max(f.w || 0, f.h || 0) / 2 + 1.0, 1.6);
+  const c = new OffscreenCanvas(N, N), x = c.getContext('2d'); x.fillStyle = '#07080a'; x.fillRect(0, 0, N, N);
+  x.imageSmoothingEnabled = false;
+  let g = G, cx = f.x, cy = f.y, bmp;
+  if (f.instance) { g = PG; [cx, cy] = inst(f.instance)(f.x, f.y); bmp = await composePanel(layer); }
+  else bmp = await composeBoard(layer, 'overlay');
+  const s = N / (2 * half);
+  x.drawImage(bmp, (g.x0 - (cx - half)) * s, ((cy + half) - g.y1) * s, g.w * g.res * s, g.h * g.res * s);
+  if (!f.instance && (f.layer === 'drill' || f.check === 'C3')) {
+    x.lineWidth = 1.5;
+    for (const [hx, hy, d] of VIEW.holes.design) { const px = (hx - cx + half) * s, py = (cy + half - hy) * s; if (px < -20 || py < -20 || px > N + 20 || py > N + 20) continue; x.strokeStyle = '#ffffff'; x.setLineDash([]); x.beginPath(); x.arc(px, py, d / 2 * s, 0, 7); x.stroke(); }
+    for (const [hx, hy, d] of VIEW.holes.cam) { const px = (hx - cx + half) * s, py = (cy + half - hy) * s; if (px < -20 || py < -20 || px > N + 20 || py > N + 20) continue; x.strokeStyle = '#3fd0ff'; x.setLineDash([4, 3]); x.beginPath(); x.arc(px, py, d / 2 * s, 0, 7); x.stroke(); }
+    x.setLineDash([]);
+  }
+  const hw = Math.max((f.w || 0) * s / 2 + 5, 8), hh = Math.max((f.h || 0) * s / 2 + 5, 8);
+  x.strokeStyle = SCOL[fstatusOf(f)]; x.lineWidth = 2; x.strokeRect(N / 2 - hw, N / 2 - hh, hw * 2, hh * 2);
+  x.fillStyle = '#000a'; x.fillRect(0, N - 20, N, 20); x.fillStyle = '#ddd'; x.font = '11px monospace';
+  x.fillText(`${f.instance ? 'panel inst ' + f.instance + ' · ' : ''}${layer} · ${(2 * half).toFixed(1)} mm wide`, 6, N - 6);
+  const blob = await c.convertToBlob({type: 'image/png'});
+  const url = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+  cropCache.set(key, url);
+  return url;
+}
+
+/* ------------------------------------------------------------------ report */
+function autoSummary() {
+  const fs = allFindings(), cnt = s => fs.filter(f => fstatusOf(f) === s).length, disp = d => fs.filter(f => (f.note ? f : fstate(f)).disposition === d).length;
+  const I = META.instances;
+  return `Fabricator CAM data (${(META.cam || '').split('/').pop()}) compared with the released design Gerbers (${(META.design || '').split('/').pop()}).` +
+    (I ? ` The design was located ${I.count} times in the CAM panel (${I.columns} x ${I.rows}).` : ' The design was not located in the CAM data.') +
+    ` Automated checks: ${DATA.fails} failing, ${cnt('REVIEW')} findings for review, ${cnt('INFO')} informational. Disposition: ${disp('accepted')} accepted, ${disp('query')} queried with the fab, ${disp('rejected')} rejected, ${disp('open')} open.`;
+}
+let reportTimer = null;
+function scheduleReport() { if ($('#app').classList.contains('m-analyse')) return; clearTimeout(reportTimer); reportTimer = setTimeout(renderReport, 250); }
+function edit(path, ph, multiline = true, tag = 'div', cls = '') {
+  const v = path.split('.').reduce((o, k) => o?.[k], S) ?? '';
+  return `<${tag} contenteditable="${multiline ? 'plaintext-only' : 'plaintext-only'}" data-path="${path}" data-ph="${esc(ph)}" class="${cls}">${esc(v)}</${tag}>`;
+}
+function reportFindings() {
+  const fs = allFindings().filter(f => (f.note ? f : fstate(f)).include);
+  const order = {rejected: 0, query: 1, open: 2, accepted: 3};
+  const sorter = S.report.groupBy === 'check' ? (a, b) => (a.check > b.check) - (a.check < b.check) || (a.id > b.id) - (a.id < b.id)
+    : (a, b) => order[(a.note ? a : fstate(a)).disposition] - order[(b.note ? b : fstate(b)).disposition] || (a.check > b.check) - (a.check < b.check);
+  return fs.sort(sorter);
+}
+async function renderReport() {
+  const R = S.report, el = $('#report'), scrollTop = el.scrollTop;
+  const fs = reportFindings(), eq = allFindings().filter(f => (f.note ? f : fstate(f)).disposition === 'query');
+  const groups = {};
+  for (const f of fs) { const g = S.report.groupBy === 'check' ? (CHECKS[f.check] || f.check) : DISP[(f.note ? f : fstate(f)).disposition]; (groups[g] = groups[g] || []).push(f); }
+  const byCheck = {}; DATA.lines.forEach(l => { const c = l.slice(0, 2); (byCheck[c] = byCheck[c] || []).push(l.slice(3)); });
+  el.innerHTML = `<div class="doc">
+    <div class="ctrl noprint"><span>Everything with a yellow hover is editable. Cards link back to the analysis.</span><span style="flex:1"></span>
+      <label>group findings by <select id="grp"><option value="disposition" ${R.groupBy !== 'check' ? 'selected' : ''}>disposition</option><option value="check" ${R.groupBy === 'check' ? 'selected' : ''}>check</option></select></label>
+      <button id="addSec">Add section</button></div>
+    ${edit('report.title', 'Report title', false, 'h1')}
+    <table style="margin:10px 0"><tbody>
+      <tr><th style="width:150px">Board</th><td>${esc(boardName)}</td><th style="width:110px">Date</th><td>${edit('report.fields.date', 'date', false, 'span')}</td></tr>
+      <tr><th>Supplier</th><td>${edit('report.fields.supplier', 'supplier', false, 'span')}</td><th>Order / ref</th><td>${edit('report.fields.order', 'order or quote number', false, 'span')}</td></tr>
+      <tr><th>Reviewer</th><td>${edit('report.fields.reviewer', 'name', false, 'span')}</td><th>Decision</th><td><select id="decision" class="decision"><option value="">(not decided)</option>${['Approve', 'Approve with comments', 'Hold for fab answers', 'Reject'].map(d => `<option ${R.decision === d ? 'selected' : ''}>${d}</option>`).join('')}</select></td></tr>
+      <tr><th>CAM data</th><td colspan="3" class="mono">${esc((META.cam || '').split('/').pop())}<br><span class="muted">sha256 ${esc(META.cam_sha256)}</span></td></tr>
+      <tr><th>Design release</th><td colspan="3" class="mono">${esc((META.design || '').split('/').pop())}<br><span class="muted">sha256 ${esc(META.design_sha256)}</span></td></tr>
+      <tr><th>Analysis</th><td colspan="3" class="mono">${esc(META.tool)} ${esc(META.tool_revision)}; res ${META.params.res} mm, tolerance ${META.params.tol} mm, min area ${META.params.min_area} mm², hole ${META.params.hole_tol}/${META.params.move_tol} mm, edge band ${META.params.edge_band} mm</td></tr>
+    </tbody></table>
+    <h2>Summary</h2>
+    <div contenteditable="plaintext-only" data-path="report.summary" data-ph="Summary" style="white-space:pre-wrap">${esc(R.summary || autoSummary())}</div>
+    <div class="ctrl noprint"><span>${R.summary ? 'Custom summary.' : 'Automatic summary; it updates until you edit it.'}</span><button id="fillSummary">Reset to automatic summary</button></div>
+    <h2>Automated checks</h2>
+    <table><thead><tr><th style="width:130px">Check</th><th>Result</th><th style="width:30%">Reviewer note</th></tr></thead><tbody>
+    ${Object.keys(CHECKS).filter(c => byCheck[c]).map(c => `<tr><td><b>${c}</b> ${esc(CHECKS[c])}</td><td class="mono" style="font-size:11px;white-space:pre-wrap">${esc(byCheck[c].join('\n'))}</td><td>${edit('report.checkNotes.' + c, 'note')}</td></tr>`).join('')}
+    </tbody></table>
+    <h2>Findings <span class="muted" style="font-weight:400;font-size:13px">${fs.length} in report</span></h2>
+    ${Object.entries(groups).map(([g, list]) => `<h3 style="margin:18px 0 4px">${esc(g)} <span class="muted" style="font-weight:400">(${list.length})</span></h3>` + list.map(f => card(f)).join('')).join('') || '<p class="muted">No findings are included in the report.</p>'}
+    <h2>Engineering questions for the fab</h2>
+    ${edit('report.eqIntro', 'Introduction to the questions (optional)')}
+    ${eq.length ? `<table><thead><tr><th style="width:40px">#</th><th>Question</th><th style="width:170px">Location</th></tr></thead><tbody>${eq.map((f, i) => `<tr><td>${i + 1}</td><td><b>${esc(ftitle(f))}</b>${(f.note ? f : fstate(f)).comment ? '<br>' + esc((f.note ? f : fstate(f)).comment) : ''}</td><td class="mono" style="font-size:11px">${esc(f.layer || '')}${f.x != null ? ` (${f.x.toFixed(2)}, ${f.y.toFixed(2)})` : ''}${f.instance ? ' inst ' + f.instance : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">No findings are marked "Query fab".</p>'}
+    ${(S.report.sections || []).map((s, i) => `<div class="sec"><div class="secctl noprint"><button data-mv="${i}" data-dir="-1">↑</button><button data-mv="${i}" data-dir="1">↓</button><button data-rm="${i}">✕</button></div>
+      <h2 contenteditable="plaintext-only" data-sec="${i}" data-f="heading" data-ph="Section heading">${esc(s.heading)}</h2>
+      <div contenteditable="plaintext-only" data-sec="${i}" data-f="body" data-ph="Section text" style="white-space:pre-wrap">${esc(s.body)}</div></div>`).join('')}
+    <h2>Conclusion</h2>
+    ${edit('report.conclusion', 'Conclusion and conditions of approval')}
+  </div>`;
+  el.scrollTop = scrollTop;
+  bindReport();
+  for (const f of fs) { const im = await crop(f), slot = el.querySelector(`[data-img="${CSS.escape(f.id)}"]`); if (slot) slot.innerHTML = im ? `<img src="${im}" alt="">` : '<div class="noimg">no location</div>'; }
+}
+function card(f) {
+  const st = f.note ? f : fstate(f);
+  return `<div class="card" data-card="${esc(f.id)}"><div data-img="${esc(f.id)}"><div class="noimg">…</div></div><div>
+    <div><span class="chip s-${fstatusOf(f)}">${fstatusOf(f)}</span> <span class="mono muted">${esc(f.id)}</span> <span class="muted">· ${esc(CHECKS[f.check] || f.check)}${f.layer ? ' · ' + esc(f.layer) : ''}${f.x != null ? ` · (${f.x.toFixed(2)}, ${f.y.toFixed(2)}) mm` : ''}${f.instance ? ' · panel instance ' + f.instance : ''}</span><button class="lnk" data-show="${esc(f.id)}">show in analysis ↗</button></div>
+    <h3 contenteditable="plaintext-only" data-ft="${esc(f.id)}" style="margin:4px 0">${esc(ftitle(f))}</h3>
+    ${f.detail ? `<div class="muted" style="font-size:12px">${esc(f.detail)}</div>` : ''}
+    <div class="ctrl"><span>Disposition</span><select data-fd="${esc(f.id)}">${Object.entries(DISP).map(([k, v]) => `<option value="${k}" ${st.disposition === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <label class="noprint"><input type="checkbox" data-fi="${esc(f.id)}" checked> in report</label></div>
+    <div contenteditable="plaintext-only" data-fc="${esc(f.id)}" data-ph="Comment" style="white-space:pre-wrap">${esc(st.comment || '')}</div>
+  </div></div>`;
+}
+function setPath(path, v) { const ks = path.split('.'); let o = S; for (const k of ks.slice(0, -1)) o = o[k] = o[k] || {}; o[ks.at(-1)] = v; }
+function bindReport() {
+  const el = $('#report');
+  $$('[data-path]', el).forEach(n => n.addEventListener('input', () => { setPath(n.dataset.path, n.innerText.replace(/\n$/, '')); save(); if (n.dataset.path === 'report.title') $('#title').textContent = S.report.title; }));
+  $$('[data-ft]', el).forEach(n => n.addEventListener('input', () => { const f = fget(n.dataset.ft); const v = n.innerText.trim(); if (f.note) S.notes.find(x => x.id === f.id).title = v; else fstate(f).title_override = v === f.title ? '' : v; save(); renderList(); if (V.sel === f.id) renderDetail(); }));
+  $$('[data-fc]', el).forEach(n => n.addEventListener('input', () => { const f = fget(n.dataset.fc); (f.note ? S.notes.find(x => x.id === f.id) : fstate(f)).comment = n.innerText.replace(/\n$/, ''); save(); if (V.sel === f.id) renderDetail(); }));
+  $$('[data-fd]', el).forEach(n => n.onchange = () => setDisp(fget(n.dataset.fd), n.value));
+  $$('[data-fi]', el).forEach(n => n.onchange = () => { const f = fget(n.dataset.fi); (f.note ? S.notes.find(x => x.id === f.id) : fstate(f)).include = n.checked; save(); refreshAll(); });
+  $$('[data-show]', el).forEach(n => n.onclick = () => { if ($('#app').classList.contains('m-report')) setView('split'); select(n.dataset.show, true); });
+  $$('[data-sec]', el).forEach(n => n.addEventListener('input', () => { S.report.sections[+n.dataset.sec][n.dataset.f] = n.innerText.replace(/\n$/, ''); save(); }));
+  $$('[data-mv]', el).forEach(b => b.onclick = () => { const i = +b.dataset.mv, j = i + +b.dataset.dir, a = S.report.sections; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; save(); renderReport(); });
+  $$('[data-rm]', el).forEach(b => b.onclick = () => { S.report.sections.splice(+b.dataset.rm, 1); save(); renderReport(); });
+  $('#addSec', el).onclick = () => { S.report.sections.push({heading: 'New section', body: ''}); save(); renderReport(); };
+  $('#grp', el).onchange = e => { S.report.groupBy = e.target.value; save(); renderReport(); };
+  $('#decision', el).onchange = e => { S.report.decision = e.target.value; save(); };
+  $('#fillSummary', el).onclick = () => { S.report.summary = ''; save(); renderReport(); };
+}
+
+/* ------------------------------------------------------------------ export */
+function download(name, type, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+const stem = () => (boardName + '_cam-review_' + (S.report.fields.date || '')).replace(/[^\w.-]+/g, '_');
+async function exportHTML() {
+  await renderReport();
+  const doc = $('#report .doc').cloneNode(true);
+  $$('.noprint,.secctl,.lnk', doc).forEach(n => n.remove());
+  $$('[contenteditable]', doc).forEach(n => { n.removeAttribute('contenteditable'); if (!n.textContent.trim()) n.remove(); });
+  $$('select', doc).forEach(s => { const sp = document.createElement('span'); sp.textContent = s.selectedOptions[0]?.textContent || ''; sp.className = s.className; s.replaceWith(sp); });
+  $$('input', doc).forEach(i => i.closest('label') ? i.closest('label').remove() : i.remove());
+  const css = [...document.styleSheets[0].cssRules].map(r => r.cssText).filter(t => t.startsWith('.doc') || t.startsWith(':root') || t.startsWith('.chip')).join('\n');
+  download(stem() + '.html', 'text/html', `<!doctype html><html><head><meta charset="utf-8"><title>${esc(S.report.title)}</title><style>${css} body{margin:0;background:#fff;font-family:var(--sans)} .doc{box-shadow:none}</style></head><body>${doc.outerHTML}</body></html>`);
+}
+async function exportMD() {
+  const R = S.report, fs = reportFindings(), eq = allFindings().filter(f => (f.note ? f : fstate(f)).disposition === 'query');
+  const L = [`# ${R.title}`, '', `| | |`, `|---|---|`, `| Board | ${boardName} |`, `| Date | ${R.fields.date || ''} |`, `| Supplier | ${R.fields.supplier || ''} |`, `| Order / ref | ${R.fields.order || ''} |`,
+    `| Reviewer | ${R.fields.reviewer || ''} |`, `| Decision | ${R.decision || '(not decided)'} |`, `| CAM data | ${(META.cam || '').split('/').pop()} (sha256 ${META.cam_sha256}) |`,
+    `| Design release | ${(META.design || '').split('/').pop()} (sha256 ${META.design_sha256}) |`, `| Analysis | ${META.tool} ${META.tool_revision}, tolerance ${META.params.tol} mm |`, '',
+    '## Summary', '', R.summary || autoSummary(), '', '## Automated checks', '', '```', ...DATA.lines, '```', ''];
+  for (const [c, n] of Object.entries(R.checkNotes || {})) if (n) L.push(`- **${c} ${CHECKS[c]}**: ${n}`);
+  L.push('', '## Findings', '');
+  for (const f of fs) {
+    const st = f.note ? f : fstate(f), im = await crop(f);
+    L.push(`### ${f.id}: ${ftitle(f)}`, '', `${fstatusOf(f)} · ${CHECKS[f.check] || f.check}${f.layer ? ' · ' + f.layer : ''}${f.x != null ? ` · (${f.x.toFixed(3)}, ${f.y.toFixed(3)}) mm` : ''}${f.instance ? ' · panel instance ' + f.instance : ''} · **${DISP[st.disposition]}**`, '');
+    if (f.detail) L.push(f.detail, '');
+    if (st.comment) L.push(st.comment, '');
+    if (im) L.push(`![${f.id}](${im})`, '');
+  }
+  L.push('## Engineering questions for the fab', '');
+  if (R.eqIntro) L.push(R.eqIntro, '');
+  eq.forEach((f, i) => { const st = f.note ? f : fstate(f); L.push(`${i + 1}. **${ftitle(f)}** (${f.layer || ''}${f.x != null ? ` at ${f.x.toFixed(2)}, ${f.y.toFixed(2)} mm` : ''}${f.instance ? ', panel instance ' + f.instance : ''})${st.comment ? ': ' + st.comment : ''}`); });
+  for (const s of R.sections || []) L.push('', `## ${s.heading}`, '', s.body);
+  L.push('', '## Conclusion', '', R.conclusion || '');
+  download(stem() + '.md', 'text/markdown', L.join('\n') + '\n');
+}
+function exportEQ() {
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['No', 'ID', 'Layer', 'X mm', 'Y mm', 'Panel instance', 'Question', 'Comment']];
+  allFindings().filter(f => (f.note ? f : fstate(f)).disposition === 'query').forEach((f, i) => { const st = f.note ? f : fstate(f); rows.push([i + 1, f.id, f.layer || '', f.x?.toFixed(3) ?? '', f.y?.toFixed(3) ?? '', f.instance || '', ftitle(f), st.comment || '']); });
+  download(stem() + '_EQ.csv', 'text/csv', rows.map(r => r.map(q).join(',')).join('\r\n') + '\r\n');
+}
+$('#exportMenu > button').onclick = e => { e.stopPropagation(); $('#exportMenu').classList.toggle('open'); };
+document.addEventListener('click', () => $('#exportMenu').classList.remove('open'));
+$$('#exportMenu [data-x]').forEach(b => b.onclick = async () => {
+  $('#exportMenu').classList.remove('open');
+  const x = b.dataset.x;
+  if (x === 'pdf') { await renderReport(); window.print(); }
+  else if (x === 'html') exportHTML();
+  else if (x === 'md') exportMD();
+  else if (x === 'eq') exportEQ();
+  else if (x === 'json') download(stem() + '_review.json', 'application/json', JSON.stringify(S, null, 1));
+  else if (x === 'import') $('#importFile').click();
+});
+$('#importFile').onchange = async e => {
+  const file = e.target.files[0]; if (!file) return;
+  try { const got = JSON.parse(await file.text()); if (got.data_id && got.data_id !== DATA_ID && !confirm('This review was made for different input files. Import anyway?')) return; S = merge(DEFAULT(), got); save(); refreshAll(); }
+  catch (err) { alert('Not a review file: ' + err.message); }
+  e.target.value = '';
+};
+window.addEventListener('beforeprint', () => { if (!$('#report .doc')) renderReport(); });
+
+/* ------------------------------------------------------------------ re-run (served only) */
+if (serverMode) $('#rerunBtn').style.display = '';
+$('#rerunBtn').onclick = () => {
+  const P = META.params, lab = {tol: 'geometry tolerance, mm', min_area: 'smallest difference, mm²', hole_tol: 'exact hole match, mm', move_tol: 'moved hole match, mm', edge_band: 'edge band, mm', res: 'resolution, mm/px'};
+  $('#rerunKv').innerHTML = Object.keys(lab).map(k => `<label for="rr_${k}">${lab[k]}</label><input type="number" step="any" id="rr_${k}" value="${P[k]}">`).join('');
+  $('#rerunDlg').showModal();
+};
+$('#rerunCancel').onclick = () => $('#rerunDlg').close();
+$('#rerunGo').onclick = async () => {
+  const body = {}; $$('#rerunKv input').forEach(i => body[i.id.slice(3)] = +i.value);
+  $('#rerunDlg').close(); $('#busy').classList.add('show'); $('#busy').textContent = 'running the analysis… this takes about a minute';
+  try { const r = await fetch('rerun', {method: 'POST', body: JSON.stringify(body)}); const j = await r.json(); if (!j.ok) throw new Error(j.error); location.reload(); }
+  catch (e) { $('#busy').classList.remove('show'); alert('Re-run failed: ' + e.message); }
+};
+
+/* ------------------------------------------------------------------ modes, keys, boot */
+function setView(m) {
+  $('#app').className = 'm-' + m; $$('#modes button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  if (m !== 'analyse') renderReport(); else renderDetail();
+  requestAnimationFrame(resize);
+}
+function setMode(m) { V.mode = m; $$('#vmodes button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); fit(); }
+$$('#modes button').forEach(b => b.onclick = () => setView(b.dataset.m));
+$$('#vmodes button').forEach(b => b.onclick = () => setMode(b.dataset.v));
+['#o_outline', '#o_band', '#o_hd', '#o_hc', '#o_mk'].forEach(s => $(s).onchange = () => { draw(); cropCache.clear(); });
+$('#t_measure').onclick = () => setTool('measure'); $('#t_note').onclick = () => setTool('note'); $('#t_fit').onclick = fit;
+$('#helpBtn').onclick = () => $('#helpDlg').showModal();
+function refreshAll() { renderLayers(); renderList(); renderDetail(); draw(); scheduleReport(); }
+document.addEventListener('keydown', e => {
+  const t = e.target; if (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName)) { if (e.key === 'Escape') t.blur(); return; }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); renderReport().then(() => window.print()); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase(), vis = visibleFindings(), i = vis.findIndex(f => f.id === V.sel);
+  if (k === 'a') setView('analyse'); else if (k === 's') setView('split'); else if (k === 'r') setView('report');
+  else if (k === 'f') fit(); else if (k === 'm') setTool('measure'); else if (k === 'n') setTool('note');
+  else if (k === 'escape') { setTool(null); V.meas = []; draw(); }
+  else if (k === 'j' && vis.length) select(vis[Math.min(i + 1, vis.length - 1)].id, true);
+  else if (k === 'k' && vis.length) select(vis[Math.max(i - 1, 0)].id, true);
+  else if (V.sel && '0123'.includes(k)) setDisp(fget(V.sel), ['open', 'accepted', 'query', 'rejected'][+k]);
+  else if (V.sel && k === 'i') { const f = fget(V.sel), st = f.note ? S.notes.find(n => n.id === f.id) : fstate(f); st.include = !st.include; save(); refreshAll(); }
+  else if (k === 'v') { const ms = ['overlay', 'design', 'cam', 'flag', 'panel']; setMode(ms[(ms.indexOf(V.mode) + 1) % ms.length]); }
+  else if ((k === '[' || k === ']') && VIEW) { const ks = VIEW.layers.map(L => L.key), j = ks.indexOf(V.layer); setLayer(ks[(j + (k === ']' ? 1 : ks.length - 1)) % ks.length]); }
+  else if (k === '/') { e.preventDefault(); $('#q').focus(); }
+  else if (k === '?') $('#helpDlg').showModal();
+  else return;
+  e.preventDefault();
+});
+new ResizeObserver(resize).observe($('#canvasWrap'));
+(async function boot() {
+  await loadState();
+  $('#title').textContent = S.report.title; document.title = S.report.title;
+  const ov = $('#overall'); ov.textContent = DATA.fails ? `${DATA.fails} FAIL` : 'no fails'; ov.className = 'chip ' + (DATA.fails ? 's-FAIL' : 's-PASS');
+  if (!VIEW) { $('#canvasWrap').innerHTML = '<div style="padding:30px" class="mut">The design could not be located in the CAM data; only the report is available.</div>'; }
+  renderLayers(); renderList(); renderDetail();
+  const h = new URLSearchParams(location.hash.slice(1));
+  setView(h.get('view') || 'analyse');
+  if (VIEW) { await new Promise(r => requestAnimationFrame(r)); resize(); fit(); }
+  if (h.get('select')) select(h.get('select'), true);
+  if (h.get('mode')) setMode(h.get('mode'));
+  if (h.get('layer')) setLayer(h.get('layer'));
+  document.body.dataset.ready = '1';
+})();
+</script>
+</body>
+</html>
