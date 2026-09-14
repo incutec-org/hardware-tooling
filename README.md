@@ -11,6 +11,7 @@ The repository is intentionally split by concern:
 hardware/kicad/                 reusable KiCad inspection and export tools
 hardware/release/               hardware release preparation and approval gates
 templates/hardware-repository/ generic starting point for a hardware repo
+docs/                            repository-agnostic documentation scanning
 tests/                          hardware-tool regression tests
 ```
 
@@ -110,6 +111,25 @@ licence is retained as `LICENSE.upstream`.
 sh hardware/kicad/multiboard/install.sh
 $KPY hardware/kicad/multiboard/update.py path/to/project [board ...]
 ```
+
+## Documentation scanning
+
+`docs/stale_check.py` (stdlib only) walks every git-tracked text file (`.md`,
+`.txt`, `.json`, `.yml`, `.yaml`, `.toml`, `.py`, `.ts`, `.tsx`, `.sh`) of the
+workspace root and of every repository in the root `repos.json` that exists
+on disk, and reports `path:line:term` for the terms in `docs/stale_terms.json`
+(a retired system stated as current authority, an old contact address or
+domain, or leftover placeholder text). `docs/stale_terms.json` also carries
+the path-glob allowlist for historical evidence that must keep the words.
+
+```sh
+python3 docs/stale_check.py --workspace-root /path/to/Incutec --summary
+python3 docs/stale_check.py --workspace-root /path/to/Incutec --repo erp --json
+```
+
+Exit status 1 when a hit exists outside the allowlist. The workspace root's
+own `.incutec/tests/test_stale_check.py` runs it against the whole workspace
+and only checks that it runs and returns valid JSON.
 
 ## Repository template
 
