@@ -8,6 +8,7 @@ publication orchestration in their own repositories.
 The repository is intentionally split by concern:
 
 ```text
+hardware/agents_section_sync.py sync one Markdown section from a template into files
 hardware/kicad/                 reusable KiCad inspection and export tools
 hardware/release/               hardware release preparation and approval gates
 templates/hardware-repository/ generic starting point for a hardware repo
@@ -85,6 +86,13 @@ browser until exported. `--help` lists the checks and tolerances.
 
 All tools above live under `hardware/kicad/`. Batch operations require an
 explicit root; project-specific values belong in the consuming repository.
+
+## Documentation sync
+
+`hardware/agents_section_sync.py` copies one `## <name>` section verbatim from
+a template Markdown file into target files, or reports drift with `--check`
+(exit 1 when any target differs). Product portfolios use it to keep a shared
+section of their board `AGENTS.md` files identical to their template.
 
 ## Release preparation
 
