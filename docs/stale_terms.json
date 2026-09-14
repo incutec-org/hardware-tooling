@@ -103,6 +103,8 @@
     "**/changelog*",
     "**/archive/**",
     "**/Archive/**",
-    "**/.git/**"
+    "**/.git/**",
+    "scripts/docs/stale_terms.json",
+    "scripts/tests/test_stale_check.py"
   ]
 }
