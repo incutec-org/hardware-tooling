@@ -43,6 +43,7 @@ flowchart TB
     ROOT["scripts/"]
 
     ROOT --> META
+    ROOT --> DOCS
     ROOT --> INSPECT
     ROOT --> FAB
     ROOT --> MEDIA
@@ -54,6 +55,12 @@ flowchart TB
         A1["hardware/agents_section_sync.py<br/>stamp or --check one ## section"]
         A2["overview_check.py<br/>OVERVIEW.md rules"]
         A3["tests/<br/>pytest"]
+    end
+
+    subgraph DOCS["docs/ · WORKSPACE DOCUMENTATION TOOLING"]
+        direction LR
+        D1["stale_check.py<br/>walks repos.json checkouts"]
+        D2["stale_terms.json<br/>retired-system terms · path allowlist"]
     end
 
     subgraph INSPECT["hardware/kicad · INSPECTION"]
@@ -105,6 +112,7 @@ flowchart TB
 
     class ROOT root;
     class A1,A2,A3 meta;
+    class D1,D2 meta;
     class I1,I2,I3,I4 inspect;
     class F1,F2,F3,F4,F5,F6 fab;
     class M1,M2,M3,M4,M5 media;
@@ -112,6 +120,7 @@ flowchart TB
     class T1,T2,T3 tpl;
 
     style META fill:transparent,stroke:#475569,color:#cbd5e1;
+    style DOCS fill:transparent,stroke:#475569,color:#cbd5e1;
     style INSPECT fill:transparent,stroke:#64748b,color:#e2e8f0;
     style FAB fill:transparent,stroke:#b45309,color:#fed7aa;
     style MEDIA fill:transparent,stroke:#0f766e,color:#99f6e4;

@@ -5,8 +5,9 @@ used across Incutec-managed hardware projects. OpenDrone product names, release
 exceptions, portfolio policy, brand rules, and publication orchestration do not
 belong here.
 
-Tools live in `hardware/`, repository templates in `templates/`. See
-`README.md` for the per-tool index.
+Tools live in `hardware/`, repository templates in `templates/`, and
+repository-agnostic documentation scanning in `docs/`. See `README.md` for
+the per-tool index.
 
 The user's request is the task; scripts must not discover and execute unrelated
 work automatically. Keep behavior deterministic, parameterized, and safe to
