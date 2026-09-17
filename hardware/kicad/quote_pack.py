@@ -21,6 +21,8 @@ Produces production/quote-pack-<rev>/ with, for every big supplier:
                              rejects anything but their xlsx layout)
   <stem>_bom_pcbgogo.xlsx    PCBGOGO template columns (bare TPs marked DNS)
   <stem>_positions.csv/.zip  FT pick and place (JLC rotation convention)
+  <stem>_assembly_top.svg/png    assembly drawing with pin 1 in red
+  <stem>_assembly_bottom.svg/png mirrored assembly drawing with pin 1 in red
 
 --skip-ft reuses the existing FT export in production/ instead of
 re-running Fabrication Toolkit headless. --boms-only additionally leaves
@@ -241,6 +243,11 @@ def main():
         with zipfile.ZipFile(pz, 'w', zipfile.ZIP_DEFLATED) as z:
             z.write(os.path.join(pack, f'{stem}_positions.csv'),
                     f'{stem}_positions.csv')
+        # Assembly maps travel with every generic release.  They are the
+        # review reference for polarity and rotation, and must be made from
+        # the same board revision as the positions file and Gerbers.
+        import assembly_drawing
+        assembly_drawing.render(board, stem, pack, dpi=300, png=True)
 
     print(f"{pack}: {len(rows)} BOM lines -> universal, jlcpcb, nextpcb, makerpcb, pcbgogo{' (boms only)' if a.boms_only else ' + gerbers, portal, positions'}")
 
