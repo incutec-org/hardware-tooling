@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    name: Tests (python3 -m pytest tests/)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      # Only pytest is installed: no KiCad, pcbnew, wx or OCP on this
+      # runner. Tests whose module needs KiCad's bundled Python (cam_compare:
+      # numpy, scipy, pillow, gerbonara) already catch the ImportError and
+      # skip; verified in a clean venv with only pytest installed:
+      # 29 passed, 12 skipped, 0 errors.
+      - name: Install Python dependencies
+        run: pip install pytest==9.1.1
+
+      - name: Run tests
+        run: python3 -m pytest tests/
+
+  overview-check:
+    name: Overview check (python3 overview_check.py .)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Run overview check
+        run: python3 overview_check.py .
