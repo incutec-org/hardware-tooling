@@ -13,6 +13,26 @@ assert SPEC.loader is not None
 sys.modules["stale_check"] = stale_check
 SPEC.loader.exec_module(stale_check)
 
+WORKSPACE_TERMS = {
+    "schema_version": 1,
+    "description": "term list for the test workspace",
+    "terms": [
+        {
+            "id": "retired_system",
+            "type": "literal",
+            "pattern": "OldTracker",
+            "reason": "OldTracker is retired.",
+        },
+        {
+            "id": "old_contact",
+            "type": "literal",
+            "pattern": "sales@old.example",
+            "reason": "Outbound mail moved to another domain.",
+        },
+    ],
+    "allowlist_globs": ["root/.incutec/stale_terms.json"],
+}
+
 
 def run_git(cwd, *args):
     subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True)
@@ -38,8 +58,20 @@ class StaleCheckTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def write_workspace_terms(self, data=None):
+        terms_path = self.workspace / ".incutec" / "stale_terms.json"
+        terms_path.parent.mkdir(parents=True, exist_ok=True)
+        terms_path.write_text(
+            json.dumps(data if data is not None else WORKSPACE_TERMS), encoding="utf-8"
+        )
+        return terms_path
+
+    def compiled_workspace_terms(self):
+        return stale_check.compile_terms(WORKSPACE_TERMS["terms"])
+
     def build_workspace(self):
         init_repo(self.workspace)
+        self.write_workspace_terms()
         (self.workspace / "repos.json").write_text(
             json.dumps(
                 {
@@ -53,27 +85,23 @@ class StaleCheckTests(unittest.TestCase):
             encoding="utf-8",
         )
         (self.workspace / "AGENTS.md").write_text(
-            "We used Shopify for checkout.\n", encoding="utf-8"
+            "We used OldTracker for stock.\n", encoding="utf-8"
         )
         commit_all(self.workspace)
 
         erp = self.workspace / "erp"
         init_repo(erp)
-        (erp / "PLAN.md").write_text(
-            "Shopify and InvenTree are retired.\n", encoding="utf-8"
-        )
+        (erp / "PLAN.md").write_text("OldTracker is retired.\n", encoding="utf-8")
         (erp / "README.md").write_text(
-            "Contact sales@incutec.eu for now.\n", encoding="utf-8"
+            "Contact sales@old.example for now.\n", encoding="utf-8"
         )
         (erp / "notes.bin").write_bytes(b"\x00\x01binary, not scanned\n")
         commit_all(erp)
 
     def test_allowlisted_path_is_excluded_from_hits(self):
         self.build_workspace()
-        terms, allowlist = stale_check.load_terms(stale_check.DEFAULT_TERMS_PATH)
-        compiled = stale_check.compile_terms(terms)
         hits = stale_check.scan_repository(
-            "erp", self.workspace / "erp", compiled, ["erp/PLAN.md"]
+            "erp", self.workspace / "erp", self.compiled_workspace_terms(), ["erp/PLAN.md"]
         )
         plan_hits = [h for h in hits if h.path == "PLAN.md"]
         readme_hits = [h for h in hits if h.path == "README.md"]
@@ -85,10 +113,8 @@ class StaleCheckTests(unittest.TestCase):
 
     def test_binary_and_untracked_extensions_are_skipped(self):
         self.build_workspace()
-        terms, _ = stale_check.load_terms(stale_check.DEFAULT_TERMS_PATH)
-        compiled = stale_check.compile_terms(terms)
         hits = stale_check.scan_repository(
-            "erp", self.workspace / "erp", compiled, []
+            "erp", self.workspace / "erp", self.compiled_workspace_terms(), []
         )
         self.assertFalse(any(h.path == "notes.bin" for h in hits))
 
@@ -105,6 +131,28 @@ class StaleCheckTests(unittest.TestCase):
         scanned, _ = stale_check.resolve_repositories(self.workspace, {"erp"})
         self.assertEqual([name for name, _ in scanned], ["erp"])
 
+    def test_example_terms_file_is_loadable(self):
+        terms, allowlist = stale_check.load_terms(stale_check.EXAMPLE_TERMS_PATH)
+        self.assertTrue(terms)
+        self.assertTrue(allowlist)
+        stale_check.compile_terms(terms)
+
+    def test_terms_resolution_prefers_explicit_then_workspace_then_example(self):
+        init_repo(self.workspace)
+        elsewhere = self.workspace / "elsewhere.json"
+
+        self.assertEqual(
+            stale_check.resolve_terms_path(elsewhere, self.workspace), elsewhere
+        )
+        self.assertEqual(
+            stale_check.resolve_terms_path(None, self.workspace),
+            stale_check.EXAMPLE_TERMS_PATH,
+        )
+        workspace_terms = self.write_workspace_terms()
+        self.assertEqual(
+            stale_check.resolve_terms_path(None, self.workspace), workspace_terms
+        )
+
     def test_cli_json_output_is_valid_and_exit_code_reflects_hits(self):
         self.build_workspace()
         result = subprocess.run(
@@ -118,15 +166,37 @@ class StaleCheckTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.returncode, 1, result.stderr)
         payload = json.loads(result.stdout)
+        self.assertEqual(
+            Path(payload["terms_file"]),
+            (self.workspace / ".incutec" / "stale_terms.json").resolve(),
+        )
         self.assertGreater(payload["total_hits"], 0)
         self.assertIn("root", payload["repos_scanned"])
         self.assertIn("erp", payload["repos_scanned"])
         self.assertIn("not-cloned", payload["repos_skipped"])
 
+    def test_missing_explicit_terms_file_is_an_error(self):
+        self.build_workspace()
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(MODULE_PATH),
+                "--workspace-root",
+                str(self.workspace),
+                "--terms",
+                str(self.workspace / "no-such-terms.json"),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("term list not found", result.stderr)
+
     def test_clean_workspace_exits_zero(self):
         init_repo(self.workspace)
+        self.write_workspace_terms()
         (self.workspace / "repos.json").write_text(
             json.dumps({"repositories": [{"path": ".", "url": "x", "branch": "main"}]}),
             encoding="utf-8",

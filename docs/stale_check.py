@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 """Scan the workspace for stale documentation claims.
 
-De-biasing tool for the workspace-wide documentation refactor: walks every
+De-biasing tool for a workspace-wide documentation refactor: walks every
 git-tracked text file of the root repository and of every repository listed
 in `repos.json` that exists on disk, and reports `path:line:term` for a term
-list kept in `stale_terms.json` (retired systems stated as current authority,
-an old contact address, an old primary domain, or leftover placeholder text).
+list (retired systems stated as current authority, an old contact address, an
+old primary domain, or leftover placeholder text).
 
 Usage:
     python3 docs/stale_check.py [--workspace-root PATH] [--repo NAME ...]
                                  [--terms PATH] [--summary] [--json]
+
+The term list is workspace record, not tool configuration, so it lives in the
+workspace being scanned. `--terms` selects it explicitly; otherwise it is
+`<workspace-root>/.incutec/stale_terms.json` when that file exists, and
+`docs/stale_terms.example.json` next to this script otherwise. The example
+carries only generic placeholder terms and documents the file format.
 
 `--workspace-root` defaults to the directory that holds `repos.json`, found
 by walking up from the current directory; pass it explicitly when running
@@ -20,8 +26,8 @@ from elsewhere. `--repo` limits the scan to one or more repository names
 A repository entry is scanned only when its directory exists on disk and is
 a Git checkout; entries that are not cloned locally are silently skipped, so
 this tool degrades gracefully when it runs from a worktree that has no
-sibling checkouts. Exit status 1 when a hit exists outside the allowlist in
-`stale_terms.json`, 0 otherwise (including when nothing was scanned).
+sibling checkouts. Exit status 1 when a hit exists outside the term list's
+allowlist, 0 otherwise (including when nothing was scanned).
 """
 
 from __future__ import annotations
@@ -49,7 +55,8 @@ TRACKED_EXTENSIONS = {
     ".sh",
 }
 
-DEFAULT_TERMS_PATH = Path(__file__).with_name("stale_terms.json")
+EXAMPLE_TERMS_PATH = Path(__file__).with_name("stale_terms.example.json")
+WORKSPACE_TERMS_RELPATH = Path(".incutec") / "stale_terms.json"
 
 
 @dataclass
@@ -68,6 +75,17 @@ def find_workspace_root(start: Path) -> Path | None:
         if (candidate / "repos.json").is_file():
             return candidate
     return None
+
+
+def resolve_terms_path(explicit: Path | None, workspace_root: Path) -> Path:
+    """Pick the term list: an explicit `--terms`, else the scanned workspace's
+    own list, else the generic example shipped with this tool."""
+    if explicit is not None:
+        return explicit
+    workspace_terms = workspace_root / WORKSPACE_TERMS_RELPATH
+    if workspace_terms.is_file():
+        return workspace_terms
+    return EXAMPLE_TERMS_PATH
 
 
 def load_terms(terms_path: Path) -> tuple[list[dict], list[str]]:
@@ -180,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--workspace-root", type=Path, default=None)
     parser.add_argument("--repo", action="append", default=None, metavar="NAME")
-    parser.add_argument("--terms", type=Path, default=DEFAULT_TERMS_PATH)
+    parser.add_argument("--terms", type=Path, default=None)
     parser.add_argument("--summary", action="store_true")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
@@ -191,7 +209,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     workspace_root = workspace_root.resolve()
 
-    terms, allowlist_globs = load_terms(args.terms)
+    terms_path = resolve_terms_path(args.terms, workspace_root)
+    if not terms_path.is_file():
+        print(f"error: term list not found: {terms_path}", file=sys.stderr)
+        return 2
+    terms, allowlist_globs = load_terms(terms_path)
     compiled_terms = compile_terms(terms)
     only = set(args.repo) if args.repo else None
 
@@ -210,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
             "workspace_root": str(workspace_root),
             "repos_scanned": [name for name, _ in scanned],
             "repos_skipped": skipped,
-            "terms_file": str(args.terms),
+            "terms_file": str(terms_path),
             "total_hits": len(non_allowlisted),
             "total_allowlisted": len(all_hits) - len(non_allowlisted),
             "summary": summary,

@@ -5,12 +5,12 @@
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"background": "#0b1120", "lineColor": "#94a3b8", "primaryTextColor": "#f8fafc", "edgeLabelBackground": "#0b1120", "fontSize": "14px"}, "flowchart": {"curve": "linear", "nodeSpacing": 30, "rankSpacing": 60}}}%%
 flowchart LR
-    HW["OpenDrone/hardware/&lt;Board&gt;<br/>KiCad project · AGENTS.md"]
-    TPL["OpenDrone/_template/AGENTS.md<br/>Rules section"]
-    ORG["OpenDrone/_org-github/engineering/<br/>approved-violations · model-fixes"]
+    HW["&lt;portfolio&gt;/hardware/&lt;Board&gt;<br/>KiCad project · AGENTS.md"]
+    TPL["&lt;portfolio&gt; template AGENTS.md<br/>Rules section"]
+    ORG["&lt;portfolio&gt; engineering policy<br/>approved-violations · model-fixes"]
     SCR["scripts/<br/>stateless transforms<br/>no product · release · supplier data"]
     PROD["production/adapters/kicad/<br/>handoff_pack.py"]
-    BRAND["OpenDrone/brand/packaging/"]
+    BRAND["&lt;portfolio&gt; brand packaging<br/>palette passed in per run"]
     OUT["BOARD-LOCAL OUTPUTS<br/>production/ · export/ · images/"]
 
     HW -->|"board + schematic in"| SCR
@@ -18,7 +18,7 @@ flowchart LR
     ORG -.->|"--approved-violations · --fixes"| SCR
     SCR -->|"renders · STEP · fab set<br/>BOM · reports"| OUT
     SCR -->|"INCUTEC_KICAD_TOOLS<br/>quote_pack · gerber_check"| PROD
-    SCR -.->|"packaging_art.py"| BRAND
+    SCR -.->|"packaging_art.py<br/>--color · --body"| BRAND
 
     classDef design fill:#0c4a6e,stroke:#38bdf8,color:#f8fafc,stroke-width:2px;
     classDef policy fill:#27272a,stroke:#f8fafc,color:#f8fafc,stroke-width:2px;
@@ -59,8 +59,8 @@ flowchart TB
 
     subgraph DOCS["docs/ · WORKSPACE DOCUMENTATION TOOLING"]
         direction LR
-        D1["stale_check.py<br/>walks repos.json checkouts"]
-        D2["stale_terms.json<br/>retired-system terms · path allowlist"]
+        D1["stale_check.py<br/>walks repos.json checkouts<br/>terms from the scanned workspace"]
+        D2["stale_terms.example.json<br/>term + allowlist format, generic"]
     end
 
     subgraph INSPECT["hardware/kicad · INSPECTION"]
