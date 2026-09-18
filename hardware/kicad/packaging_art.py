@@ -2,16 +2,20 @@
 """
 packaging_art.py — flat vector artwork from KiCad boards.
 
-Exports front/back of a .kicad_pcb as single-color vector SVG in the black/gold
-packaging theme:
-  - pads, silkscreen, board outline in gold; tracks/zones/vias hidden
+Exports front/back of a .kicad_pcb as single-color vector SVG for packaging and
+print:
+  - pads, silkscreen, board outline in the artwork color; tracks/zones/vias hidden
   - artwork clipped to the board outline (pads never stick out past the edge)
-  - every component drawn as a simple knocked-out body with a gold outline
-    (closed Fab shapes where the library has them, otherwise a body synthesized
-    from the Fab drawings / courtyard bounding box)
-  - designer text on the mask layers (copper-pour cutout logos like "openESC")
-    moved to silk so it renders like silkscreen text
+  - every component drawn as a simple knocked-out body with an outline in the
+    artwork color (closed Fab shapes where the library has them, otherwise a
+    body synthesized from the Fab drawings / courtyard bounding box)
+  - designer text on the mask layers (copper-pour cutout logos) moved to silk
+    so it renders like silkscreen text
   - fab text (values/designators) stripped
+
+The palette is a property of the packaging design, not of this tool: `--color`
+and `--body` are required and a brand keeps its own values in the repository
+that owns the design.
 
 The source .kicad_pcb is NEVER touched — all edits happen on throwaway temp
 copies. KiCad may stay open.
@@ -19,17 +23,19 @@ copies. KiCad may stay open.
 MUST be run with KiCad's bundled Python (it imports pcbnew):
 
   KPY=/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3
-  $KPY hardware/kicad/packaging_art.py path/to/board.kicad_pcb --outdir packaging/ --png
+  $KPY hardware/kicad/packaging_art.py path/to/board.kicad_pcb --outdir packaging/ \
+      --color '#1a1a1a' --body '#e6e6e6' --png
 
 Examples:
-  # gold-on-white theme (default), SVG + PNG previews
-  packaging_art.py board.kicad_pcb --outdir packaging/ --png
+  # dark art on a white box, SVG + PNG previews
+  packaging_art.py board.kicad_pcb --outdir packaging/ --color '#1a1a1a' --body '#e6e6e6' --png
 
-  # art for a BLACK box: holes/bodies knocked out in black
-  packaging_art.py board.kicad_pcb --outdir packaging/ --holes '#0a0a0a' --body '#0a0a0a' --png --png-bg '#0a0a0a'
+  # art for a BLACK box: holes/bodies knocked out in the box color
+  packaging_art.py board.kicad_pcb --outdir packaging/ --color '#ffffff' \
+      --holes '#0a0a0a' --body '#0a0a0a' --png --png-bg '#0a0a0a'
 
   # keep copper traces / skip component bodies
-  packaging_art.py board.kicad_pcb --keep-traces --no-components
+  packaging_art.py board.kicad_pcb --color '#1a1a1a' --body '#e6e6e6' --keep-traces --no-components
 
 Dependencies: KiCad 9/10 (pcbnew + kicad-cli); rsvg-convert or ImageMagick
 (`magick`) only needed for --png.
@@ -45,7 +51,6 @@ import sys
 import tempfile
 
 DEFAULT_KICAD_CLI = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-GOLD = "#C9A227"  # packaging gold — matches the black/gold box theme
 
 BASE_LAYERS = {"top": "Edge.Cuts,F.Cu,F.SilkS", "bottom": "Edge.Cuts,B.Cu,B.SilkS"}
 FAB_LAYERS = {"top": "F.Fab", "bottom": "B.Fab"}
@@ -704,8 +709,8 @@ def tighten_head(head, ext, sx, pad_mm=0.25):
 
 
 def hulls_svg(base_text, markers_mm, hulls_mm, color, body):
-    """Component 3D silhouettes as white bodies with a gold outline, drawn over
-    the copper like the parts sit on the assembled board."""
+    """Component 3D silhouettes as body-filled shapes outlined in the artwork
+    color, drawn over the copper like the parts sit on the assembled board."""
     mapping = mm_mapping(base_text, markers_mm)
     if mapping is None or not hulls_mm:
         return ""
@@ -767,12 +772,14 @@ def main():
     ap.add_argument("--bottom", help="output SVG path for the bottom/back art")
     ap.add_argument("--outdir", help="dir for default-named outputs (<stem>-art-front.svg / -back.svg)")
     ap.add_argument("--sides", default="top,bottom", help="comma list: top,bottom (default both)")
-    ap.add_argument("--color", default=GOLD, help=f"artwork color (default packaging gold {GOLD})")
+    ap.add_argument("--color", required=True,
+                    help="artwork color for pads, silkscreen and the board outline, "
+                         "as a CSS hex value (required; the packaging design owns the palette)")
     ap.add_argument("--holes", default="#FFFFFF",
                     help="drill-hole knockout color (default #FFFFFF; use the box background color)")
-    ap.add_argument("--body", default="#F2E7C9",
-                    help="component body fill (default a light gold tint so bodies read as "
-                         "solid shapes; on a dark box use a dark tint of the background)")
+    ap.add_argument("--body", required=True,
+                    help="component body fill, as a CSS hex value (required; pick a tint of the "
+                         "box background so bodies read as solid shapes)")
     ap.add_argument("--keep-traces", action="store_true", help="keep copper tracks (hidden by default)")
     ap.add_argument("--no-components", action="store_true",
                     help="skip the Fab component bodies, pads/silk art only")

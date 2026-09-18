@@ -76,7 +76,7 @@ browser until exported. `--help` lists the checks and tolerances.
 | Tool | Purpose |
 | --- | --- |
 | `render_board.py` | Render standardized top and bottom board PNGs. |
-| `packaging_art.py` | Generate flat vector board artwork from PCB geometry. |
+| `packaging_art.py` | Generate flat vector board artwork from PCB geometry in a caller-supplied palette. |
 | `dimension_overlay.py` | Add dimensions to an existing board image. |
 | `export_step.py` | Export normalized board STEP models. |
 | `step_post.py` | Post-process STEP geometry using Open CASCADE. |
@@ -86,6 +86,16 @@ browser until exported. `--help` lists the checks and tolerances.
 
 All tools above live under `hardware/kicad/`. Batch operations require an
 explicit root; project-specific values belong in the consuming repository.
+
+`packaging_art.py` has no built-in palette: `--color` (pads, silkscreen, board
+outline) and `--body` (component body fill) are required, and `--holes` and
+`--png-bg` take the box background. The brand repository that owns the
+packaging design supplies the values.
+
+```sh
+$KPY hardware/kicad/packaging_art.py path/to/board.kicad_pcb --outdir packaging/ \
+  --color '#ffffff' --body '#0a0a0a' --holes '#0a0a0a' --png --png-bg '#0a0a0a'
+```
 
 ## Release preparation
 
@@ -117,19 +127,24 @@ $KPY hardware/kicad/multiboard/update.py path/to/project [board ...]
 `docs/stale_check.py` (stdlib only) walks every git-tracked text file (`.md`,
 `.txt`, `.json`, `.yml`, `.yaml`, `.toml`, `.py`, `.ts`, `.tsx`, `.sh`) of the
 workspace root and of every repository in the root `repos.json` that exists
-on disk, and reports `path:line:term` for the terms in `docs/stale_terms.json`
-(a retired system stated as current authority, an old contact address or
-domain, or leftover placeholder text). `docs/stale_terms.json` also carries
-the path-glob allowlist for historical evidence that must keep the words.
+on disk, and reports `path:line:term` for a term list (a retired system stated
+as current authority, an old contact address or domain, or leftover placeholder
+text). The list also carries the path-glob allowlist for historical evidence
+that must keep the words.
+
+A term list names the systems, contact points and evidence trees of one
+workspace, so it is that workspace's record and not tool configuration. The
+scanner reads `<workspace-root>/.incutec/stale_terms.json` when it exists, and
+otherwise `docs/stale_terms.example.json`, which documents the format with
+generic placeholder terms. `--terms PATH` selects a list explicitly.
 
 ```sh
-python3 docs/stale_check.py --workspace-root /path/to/Incutec --summary
-python3 docs/stale_check.py --workspace-root /path/to/Incutec --repo erp --json
+python3 docs/stale_check.py --workspace-root /path/to/workspace --summary
+python3 docs/stale_check.py --workspace-root /path/to/workspace --repo erp --json
 ```
 
-Exit status 1 when a hit exists outside the allowlist. The workspace root's
-own `.incutec/tests/test_stale_check.py` runs it against the whole workspace
-and only checks that it runs and returns valid JSON.
+Exit status 1 when a hit exists outside the allowlist, 2 when the term list is
+missing.
 
 ## Repository template
 

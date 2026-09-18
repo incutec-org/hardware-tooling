@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "description": "Example term list for docs/stale_check.py. A workspace keeps its own list at <workspace-root>/.incutec/stale_terms.json, or names one with --terms; that list is workspace record and does not belong in this repository. This example documents the format and carries only generic placeholder terms. A term is a heuristic: a hit means a file states a retired system as current authority, an old contact point, or leftover placeholder text, and needs a human look. Paths are matched as <repo>/<path-in-repo>, with \"root\" for the workspace root repository; an allowlist glob names a tree of historical evidence that is expected to keep the words.",
+  "terms": [
+    {
+      "id": "placeholder_yourcompany",
+      "type": "regex",
+      "pattern": "yourcompany",
+      "flags": "i",
+      "reason": "Placeholder text left in a template or generated document."
+    },
+    {
+      "id": "placeholder_your_logo",
+      "type": "literal",
+      "pattern": "Your Logo",
+      "reason": "Placeholder text left in a template or generated document."
+    },
+    {
+      "id": "placeholder_phone",
+      "type": "literal",
+      "pattern": "555-555",
+      "reason": "Placeholder phone number left in a template or generated document."
+    },
+    {
+      "id": "placeholder_example_domain",
+      "type": "regex",
+      "pattern": "[A-Za-z0-9._%+-]+@example\\.(?:com|net|org)",
+      "flags": "i",
+      "reason": "Placeholder contact address from the reserved example domains (RFC 2606)."
+    },
+    {
+      "id": "placeholder_lorem_ipsum",
+      "type": "regex",
+      "pattern": "lorem ipsum",
+      "flags": "i",
+      "reason": "Filler copy left in a template or generated document."
+    }
+  ],
+  "allowlist_globs": [
+    "**/CHANGELOG*",
+    "**/changelog*",
+    "**/archive/**",
+    "**/Archive/**",
+    "**/.git/**"
+  ]
+}
