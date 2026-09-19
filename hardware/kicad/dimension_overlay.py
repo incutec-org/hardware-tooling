@@ -5,7 +5,7 @@ Companion to render_board.py. Takes a transparent board PNG (board centered on a
 transparent square), composites it on a dark engineering background, and draws
 clean extension lines + double-headed dimension arrows with mm labels.
 
-Does NOT touch any KiCad file — pure image post-process.
+Does NOT touch any KiCad file: pure image post-process.
 
     python3 dimension_overlay.py in.png out.png --width-mm 10.00 --length-mm 21.50
     python3 dimension_overlay.py in.png out.png --no-dims      # dark-bg composite only

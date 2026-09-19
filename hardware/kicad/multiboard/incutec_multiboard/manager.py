@@ -170,7 +170,7 @@ class FootprintResolver:
 # This class is intentionally large: it owns the project state, the caches,
 # and all the file/PCB operations.
 #
-# The UI never manipulates PCBs directly — it asks the manager to do it.
+# The UI never manipulates PCBs directly: it asks the manager to do it.
 # That separation is intentional:
 #   dialogs.py  -> user interactions / progress reporting
 #   manager.py  -> actual work, with lots of guard rails

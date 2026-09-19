@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-render_board.py — standardized KiCad PCB → PNG renders.
+render_board.py: standardized KiCad PCB to PNG renders.
 
 Produces clean board renders for documentation: vias and solder
 paste stripped (so copper pads show as gold, not gray paste deposits), no floor
@@ -149,10 +149,10 @@ def square(magick, out, size):
     # (kicad-cli subtracts 24px from the requested dimensions), so the wrong file
     # passes any dimension check and ships looking correct.
     if not magick:
-        sys.exit("ImageMagick 'magick' not found — install it or pass --magick PATH")
+        sys.exit("ImageMagick 'magick' not found: install it or pass --magick PATH")
     # -fuzz 1% so the alpha trim treats anti-aliased edge fringe (semi-transparent
     # halo around the board on the transparent background) as background and crops
-    # it deterministically — without it, a stray near-transparent fringe pixel can
+    # it deterministically; without it, a stray near-transparent fringe pixel can
     # shift the trim by a pixel or two and jitter the registration between runs.
     subprocess.run(
         [magick, out, "-fuzz", "1%", "-trim", "+repage", "-background", "none",
@@ -240,7 +240,7 @@ def main():
                     except OSError:
                         pass
         if hashlib.md5(open(pcb, "rb").read()).hexdigest() != before:
-            sys.exit(f"!! {pcb} CHANGED — it never should; investigate before committing")
+            sys.exit(f"!! {pcb} CHANGED: it never should; investigate before committing")
 
 
 if __name__ == "__main__":
