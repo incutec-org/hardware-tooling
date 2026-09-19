@@ -10,9 +10,11 @@ The repository is intentionally split by concern:
 ```text
 hardware/kicad/                 reusable KiCad inspection and export tools
 hardware/release/               hardware release preparation and approval gates
-templates/hardware-repository/ generic starting point for a hardware repo
-docs/                            repository-agnostic documentation scanning
-tests/                          hardware-tool regression tests
+hardware/agents_section_sync.py copy one Markdown section from a template into files
+templates/hardware-repository/  generic starting point for a hardware repo
+docs/                           repository-agnostic documentation scanning
+overview_check.py               check a repository's OVERVIEW.md visual index
+tests/                          regression tests
 ```
 
 ## Requirements
@@ -95,6 +97,27 @@ packaging design supplies the values.
 ```sh
 $KPY hardware/kicad/packaging_art.py path/to/board.kicad_pcb --outdir packaging/ \
   --color '#ffffff' --body '#0a0a0a' --holes '#0a0a0a' --png --png-bg '#0a0a0a'
+```
+
+## Documentation sync
+
+`hardware/agents_section_sync.py` copies one `## <name>` section verbatim from
+a template Markdown file into target files, or reports drift with `--check`
+(exit 1 when any target differs). Product portfolios use it to keep a shared
+section of their board `AGENTS.md` files identical to their template.
+
+```sh
+python3 hardware/agents_section_sync.py --template _template/AGENTS.md \
+  --section Rules --check boards/*/AGENTS.md
+```
+
+## Visual index check
+
+`overview_check.py` validates a repository's diagram-only `OVERVIEW.md`
+(root `AGENTS.md`, "Scope routing"). Pass one or more repository roots:
+
+```sh
+python3 overview_check.py /path/to/repo
 ```
 
 ## Release preparation
