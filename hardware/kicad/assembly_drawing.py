@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Assembly drawings for fab reviewers: one image per side with every pad,
+"""Assembly maps for fab reviewers: one image per side with every pad,
 pin 1 in red and the reference on every part where orientation matters (more
 than two pads, or a D/Q/U/X/J reference); plain passives are drawn unlabeled
-so the drawing stays readable; fab/silk outlines and the board edge (board drawings and footprint edge items, the ESCs keep theirs in a
-footprint). Made after the first external turnkey RFQs, when every fab asked
-how to verify polarity and rotation from a positions file alone.
+so the drawing stays readable. Fab and silk outlines are drawn, and the board
+edge is taken from board drawings and footprint Edge.Cuts items alike (some
+boards keep their outline in a footprint). Made after the first external
+turnkey RFQs, when every fab asked how to verify polarity and rotation from a
+positions file alone. quote_pack.py calls render() so every quote pack, and
+therefore every production release, carries both maps.
 
 Reads the board with the pcbnew API (read only), writes SVG, then PNG via
 rsvg-convert or ImageMagick if either is on PATH.
 
-Usage (KiCad's bundled Python, see README "Interpreter"):
+Usage (KiCad's bundled Python, see README "Requirements"):
     $KPY assembly_drawing.py <board.kicad_pcb> [--out DIR] [--stem NAME]
-                             [--dpi 600] [--no-png]
+                             [--dpi 300] [--no-png]
 
 Output: <DIR>/<stem>_assembly_top.svg|png and <stem>_assembly_bottom.svg|png.
 The bottom view is MIRRORED (viewed from below, as the assembler sees it) and
@@ -212,7 +215,7 @@ def main():
     ap.add_argument("board")
     ap.add_argument("--out", default=None, help="output dir (default: next to the board, production/)")
     ap.add_argument("--stem", default=None, help="file stem (default: board file name)")
-    ap.add_argument("--dpi", type=int, default=600)
+    ap.add_argument("--dpi", type=int, default=300, help="PNG resolution (300 = what quote_pack writes)")
     ap.add_argument("--no-png", action="store_true")
     a = ap.parse_args()
     stem = a.stem or os.path.splitext(os.path.basename(a.board))[0]

@@ -193,9 +193,11 @@ flowchart TB
     SCH["board.kicad_sch<br/>MPN · Manufacturer fields"]
     PCB --> UB["universal_bom.py<br/>Designator · Value · Footprint<br/>LCSC · Manufacturer · MPN"]
     SCH -.->|"fill MPN gaps"| UB
-    UB --> QP["quote_pack.py<br/>production/quote-pack-&lt;rev&gt;/<br/>per-supplier BOM + positions"]
+    PCB --> AD["assembly_drawing.py<br/>top + bottom (mirrored) maps<br/>pin 1 red · not placed hatched"]
+    UB --> QP["quote_pack.py<br/>production/quote-pack-&lt;rev&gt;/<br/>per-supplier BOM + positions<br/>+ assembly maps SVG · PNG"]
+    AD --> QP
     QP --> CE["check_export.py<br/>C1–C3 vs netlist"]
-    CE -->|"pass"| HAND["production/ handoff_pack.py<br/>imports quote_pack as a module"]
+    CE -->|"pass"| HAND["production/ handoff_pack.py<br/>copies the pack into the release"]
 
     classDef input fill:#0c4a6e,stroke:#38bdf8,color:#f8fafc,stroke-width:2px;
     classDef tool fill:#1e293b,stroke:#94a3b8,color:#f8fafc,stroke-width:1.5px;
@@ -203,7 +205,7 @@ flowchart TB
     classDef production fill:#78350f,stroke:#f59e0b,color:#fff7ed,stroke-width:2px;
 
     class PCB,SCH input;
-    class UB,QP tool;
+    class UB,AD,QP tool;
     class CE gate;
     class HAND production;
 ```
