@@ -455,7 +455,7 @@ class PortDialog(BaseDialog):
     """Port manager dialog."""
 
     def __init__(self, parent, board: BoardConfig):
-        super().__init__(parent, f"Manage Ports — {board.name}", size=(600, 480), min_size=(520, 400))
+        super().__init__(parent, f"Manage Ports: {board.name}", size=(600, 480), min_size=(520, 400))
         self.board = board
         self.ports = dict(board.ports)
         self._build_ui()
@@ -506,7 +506,7 @@ class PortDialog(BaseDialog):
         self.list.DeleteAllItems()
         for name, port in sorted(self.ports.items()):
             idx = self.list.InsertItem(self.list.GetItemCount(), name)
-            self.list.SetItem(idx, 1, port.net or "—")
+            self.list.SetItem(idx, 1, port.net or "-")
             self.list.SetItem(idx, 2, port.side.capitalize())
             self.list.SetItem(idx, 3, f"{port.position:.0%}")
 
@@ -1245,7 +1245,7 @@ class MainDialog(BaseDialog):
             self.grid.SetCellValue(row, 1, name)
             self.grid.SetCellValue(row, 2, str(counts.get(name, 0)))
             self.grid.SetCellValue(row, 3, str(len(board.ports)))
-            self.grid.SetCellValue(row, 4, board.description or "—")
+            self.grid.SetCellValue(row, 4, board.description or "-")
             self.grid.SetCellValue(row, 5, board.pcb_path or "")
 
             self.grid.SetCellRenderer(row, 4, wrap_renderer)

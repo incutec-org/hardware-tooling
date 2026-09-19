@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_models.py — verify every board's 3D models before an export or a fab release.
+check_models.py: verify every board's 3D models before an export or a fab release.
 
 kicad-cli treats an unresolvable 3D model as a warning and still exits 0, so a
 board that has lost half its components exports "successfully" as a bare slab.

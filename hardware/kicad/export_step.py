@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-export_step.py — standardized STEP exports for KiCad boards.
+export_step.py: standardized STEP exports for KiCad boards.
 
 kicad-cli's default STEP export writes only the board body and the component 3D
 models: no copper, no pads, no silkscreen. Imported into Fusion that is a bare
@@ -1071,7 +1071,7 @@ def export(cli, board, out, preset, extra, dry_run, clip):
             if nclip == "no-outline":
                 note = "  WARNING: board has no closed Edge.Cuts outline, nothing clipped"
             elif nclip is None:
-                note = "  (clip skipped: pcbnew unavailable — run with KiCad's Python)"
+                note = "  (clip skipped: pcbnew unavailable, run with KiCad's Python)"
             elif nclip or ndel or nhole or nmask or nkept:
                 note = (f"  (clipped {nclip} pad(s), removed {ndel} outside, "
                         f"notched {nhole} castellation(s), "
@@ -1124,7 +1124,7 @@ def export(cli, board, out, preset, extra, dry_run, clip):
                       for ln in (result.stderr + result.stdout).splitlines()
                       if "File not found: " in ln})
     if missing:
-        print(f"  WARNING: {len(missing)} unresolved 3D model path(s) — components are missing:")
+        print(f"  WARNING: {len(missing)} unresolved 3D model path(s): components are missing:")
         for m in missing[:10]:
             print(f"    {m}")
         if len(missing) > 10:

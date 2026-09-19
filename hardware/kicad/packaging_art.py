@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-packaging_art.py — flat vector artwork from KiCad boards.
+packaging_art.py: flat vector artwork from KiCad boards.
 
 Exports front/back of a .kicad_pcb as single-color vector SVG for packaging and
 print:
@@ -17,7 +17,7 @@ The palette is a property of the packaging design, not of this tool: `--color`
 and `--body` are required and a brand keeps its own values in the repository
 that owns the design.
 
-The source .kicad_pcb is NEVER touched — all edits happen on throwaway temp
+The source .kicad_pcb is NEVER touched: all edits happen on throwaway temp
 copies. KiCad may stay open.
 
 MUST be run with KiCad's bundled Python (it imports pcbnew):
@@ -80,7 +80,7 @@ def import_pcbnew():
         import pcbnew
         return pcbnew
     except ImportError:
-        sys.exit("pcbnew not importable — run with KiCad's bundled python3 "
+        sys.exit("pcbnew not importable: run with KiCad's bundled python3 "
                  "(/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3)")
 
 
@@ -108,7 +108,7 @@ def synthesize_bodies(pcbnew, board, exclude):
     skip_pat = re.compile(r"solderpad|testpoint|test_point|fiducial|mountinghole|castellat", re.I)
     eb = board.GetBoardEdgesBoundingBox()
     max_w, max_h = int(eb.GetWidth() * 0.6), int(eb.GetHeight() * 0.6)
-    polys = []  # (fab_layer, [(x, y), ...]) — plain ints; BOX2I here segfaults
+    polys = []  # (fab_layer, [(x, y), ...]): plain ints; BOX2I here segfaults
     rects = []  # (fab_layer, l, t, r, b)
     for fp in board.GetFootprints():
         if fp.GetReference() in exclude:
@@ -148,7 +148,7 @@ def synthesize_bodies(pcbnew, board, exclude):
                     polys.append((fab, pts))
             continue
         if ext is None or min(ext[2] - ext[0], ext[3] - ext[1]) < min_dim:
-            # no courtyard, no usable fab drawing — pad extent, pulled in so the
+            # no courtyard, no usable fab drawing: pad extent, pulled in so the
             # perimeter pads peek out; never for single-pad or board-sized parts
             pads = list(fp.Pads())
             if len(pads) < 2:
@@ -160,7 +160,7 @@ def synthesize_bodies(pcbnew, board, exclude):
                 ys += [pb.GetTop(), pb.GetBottom()]
             ext = (min(xs), min(ys), max(xs), max(ys))
             if ext[2] - ext[0] > max_w and ext[3] - ext[1] > max_h:
-                continue  # spans the board (pad-array footprint) — not a body
+                continue  # spans the board (pad-array footprint), not a body
             deflate = min(pcbnew.FromMM(0.35),
                           (min(ext[2] - ext[0], ext[3] - ext[1]) - min_dim) // 2)
             ext = (ext[0] + deflate, ext[1] + deflate, ext[2] - deflate, ext[3] - deflate)
@@ -207,7 +207,7 @@ def resolve_model_path(filename, proj_dir):
     fn = re.sub(r"\$\{KISYS3DMOD\}", KICAD_3DMODELS, fn)
     stem = os.path.splitext(fn)[0]
     # prefer the tessellated mesh (.wrl) even when the footprint references the
-    # .step — STEP files carry construction geometry that pollutes silhouettes
+    # .step: STEP files carry construction geometry that pollutes silhouettes
     for cand in (stem + ".wrl", stem + ".wrz", fn, stem + ".step", stem + ".stp", stem + ".STEP"):
         if os.path.exists(cand):
             return cand
@@ -304,7 +304,7 @@ def mesh_outlines(pcbnew, path, scale, rot, cache):
             area2 = (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1)
             if abs(area2) < 1e-4:
                 # edge-on face (vertical wall). Its extent still bounds the
-                # silhouette — models without a bottom face would otherwise
+                # silhouette: models without a bottom face would otherwise
                 # collapse to their smaller top face. Emit it as a thin strip.
                 pts = sorted(((x1, y1), (x2, y2), (x3, y3)))
                 (ax, ay), (bx, by) = pts[0], pts[-1]
@@ -382,7 +382,7 @@ def _rot3(pts, deg, axis):
 def collect_hulls(pcbnew, board, proj_dir):
     """Real component silhouettes: each footprint's 3D model vertices projected
     to the board plane, convex-hulled, placed at the footprint position.
-    proj_dir = the ORIGINAL project dir (${KIPRJMOD}) — the board argument is a
+    proj_dir = the ORIGINAL project dir (${KIPRJMOD}); the board argument is a
     temp copy, so its own path must not be used to resolve models.
     Returns ({'top': [poly_mm...], 'bottom': [...]}, set_of_refs_with_hulls)."""
     eb = board.GetBoardEdgesBoundingBox()
@@ -426,7 +426,7 @@ def collect_hulls(pcbnew, board, proj_dir):
         if pts2d:
             if len(pts2d) > 100:
                 # STEP files carry a few construction/reference points outside
-                # the real body (axis markers, land-pattern rings) — trim the
+                # the real body (axis markers, land-pattern rings), trim the
                 # sparse extremes before hulling. Real edges are dense.
                 sx_ = sorted(p[0] for p in pts2d)
                 sy_ = sorted(p[1] for p in pts2d)
@@ -452,7 +452,7 @@ def collect_hulls(pcbnew, board, proj_dir):
         for poly in cand:
             # model space is y-up; board space is y-down: front = (x, -y).
             # A flipped footprint rotates the model 180° about the board X axis,
-            # which lands at (x, +y) in board coords — NOT a plain x-mirror.
+            # which lands at (x, +y) in board coords, NOT a plain x-mirror.
             local = [(x, y) for x, y in poly] if back else [(x, -y) for x, y in poly]
             # rotation is CCW-positive in board coords (y down)
             world = [(px + x * c + y * s, py - x * s + y * c) for x, y in local]
@@ -462,7 +462,7 @@ def collect_hulls(pcbnew, board, proj_dir):
         if max(xs) - min(xs) > max_w and max(ys) - min(ys) > max_h:
             continue  # broken/oversized model
         # sanity vs the courtyard: a silhouette that spills far outside it or is
-        # tiny inside it comes from a polluted/mis-scaled model — fall back
+        # tiny inside it comes from a polluted/mis-scaled model: fall back
         crt = pcbnew.B_CrtYd if back else pcbnew.F_CrtYd
         court = fp.GetCourtyard(crt)
         if court.OutlineCount() > 0:
@@ -473,11 +473,11 @@ def collect_hulls(pcbnew, board, proj_dir):
             if min(xs) < cl - slack or max(xs) > cr + slack or \
                     min(ys) < ct - slack or max(ys) > cbt + slack:
                 print(f"    !! {fp.GetReference()}: 3D silhouette spills outside its "
-                      f"courtyard — dropped, courtyard fallback used")
+                      f"courtyard: dropped, courtyard fallback used")
                 continue
             if (max(xs) - min(xs)) < 0.3 * (cr - cl) and \
                     (max(ys) - min(ys)) < 0.3 * (cbt - ct):
-                print(f"    !! {fp.GetReference()}: 3D silhouette implausibly small — "
+                print(f"    !! {fp.GetReference()}: 3D silhouette implausibly small, "
                       f"dropped, courtyard fallback used")
                 continue
         hulls[side].extend(world_polys)
@@ -494,7 +494,7 @@ def add_markers(pcbnew, board):
     mm -> SVG mapping (the plot origin is otherwise content-dependent). They
     fall outside the board clip, so they never appear in the final art.
     Returns (xA, yA, xB, yB) in mm."""
-    bb = board.ComputeBoundingBox(False)  # ALL content — stray notes outside the
+    bb = board.ComputeBoundingBox(False)  # ALL content: stray notes outside the
     # board must not out-extreme the markers, or the calibration breaks
     m = pcbnew.FromMM(MARKER_MARGIN_MM)
     ax, ay = bb.GetLeft() - m, bb.GetTop() - m
@@ -548,7 +548,7 @@ def prepare_art_copy(path, keep_traces, edge_width, proj_dir):
     print(f"    3D silhouettes: {len(have3d)} footprints "
           f"({len(hulls['top'])} top, {len(hulls['bottom'])} bottom)")
     for fp in board.GetFootprints():
-        # parts with a real silhouette drop ALL their fab drawings — the 3D
+        # parts with a real silhouette drop ALL their fab drawings: the 3D
         # hull replaces the body, and leftover open segments/arrows would draw
         # mismatched fragments over it. Only pin-1 dots (small circles) stay.
         if fp.GetReference() not in have3d:
@@ -567,14 +567,14 @@ def prepare_art_copy(path, keep_traces, edge_width, proj_dir):
     closed = {pcbnew.SHAPE_T_RECT, pcbnew.SHAPE_T_CIRCLE, pcbnew.SHAPE_T_POLY}
     for fp in board.GetFootprints():
         # open fab drawings (polarity arrows, outline fragments) just add noise
-        # next to the bodies — drop them from every footprint
+        # next to the bodies: drop them from every footprint
         for it in list(fp.GraphicalItems()):
             if isinstance(it, pcbnew.PCB_SHAPE) and it.GetLayer() in fab \
                     and it.GetShape() not in closed:
                 fp.RemoveNative(it)
     for d in list(board.GetDrawings()):
         # board-level fab graphics are documentation (motor-direction arrows,
-        # assembly notes) — never part of the art
+        # assembly notes): never part of the art
         if isinstance(d, pcbnew.PCB_SHAPE) and d.GetLayer() in fab:
             board.RemoveNative(d)
     normalize_edge(pcbnew, board, edge_width)
@@ -589,7 +589,7 @@ def prepare_art_copy(path, keep_traces, edge_width, proj_dir):
         any(it.GetLayer() == pcbnew.Edge_Cuts
             for fp in board.GetFootprints() for it in list(fp.GraphicalItems()))
     if not has_edge:
-        print("    !! no Edge.Cuts on this board — outline clip skipped, art is unclipped")
+        print("    !! no Edge.Cuts on this board: outline clip skipped, art is unclipped")
         return markers, None, hulls
 
     poly = pcbnew.SHAPE_POLY_SET()
@@ -761,7 +761,7 @@ def rasterize(svg_path, size, bg):
         subprocess.run([magick, "-background", bg if bg != "transparent" else "none",
                         "-density", "300", svg_path, "-resize", str(size), png], check=True)
         return png
-    print("    (no rsvg-convert or magick — PNG preview skipped)")
+    print("    (no rsvg-convert or magick: PNG preview skipped)")
     return None
 
 
@@ -833,7 +833,7 @@ def main():
             if bodies:
                 fill = os.path.join(tmp, f"fill-{side}.svg")
                 outline = os.path.join(tmp, f"outline-{side}.svg")
-                # no drill marks on fab passes — they'd plot as solid discs
+                # no drill marks on fab passes: they'd plot as solid discs
                 export_svg(cli, bodies, side, FAB_LAYERS[side], fill, drill=0)
                 export_svg(cli, art, side, FAB_LAYERS[side], outline, drill=0)
             composite(base, fill, outline, out, args.color, args.holes, args.body,
