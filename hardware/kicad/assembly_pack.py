@@ -17,6 +17,9 @@ Produces, next to the other release artifacts:
                         pin 1 highlighted on every part, searchable BOM with
                         MPN and LCSC, click a line to light up the part.
                         Opens in a browser with no install and no network.
+                        Silkscreen only: drawing the fabrication layer as well
+                        covers parts with the filled body outlines some
+                        footprints carry on F.Fab.
   <stem>_assembly.pdf   printable assembly drawing per side, board edge plus
                         fabrication layer plus silkscreen, the attachment a
                         fab expects on the order.
@@ -170,7 +173,6 @@ def render_ibom(board_path, stem, out_dir, sch_path=None, netlist_xml=None):
             '--no-browser', '--dest-dir', os.path.abspath(out_dir),
             '--name-format', f'{stem}_ibom',
             '--highlight-pin1', 'all',
-            '--show-fabrication',
             '--layer-view', 'FB',
             '--bom-view', 'left-right',
             '--sort-order', 'C,R,L,D,Q,U,J,TP',
