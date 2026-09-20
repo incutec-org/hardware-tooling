@@ -2,7 +2,7 @@
 
 Hardware-agnostic automation and repository templates used by Incutec to
 create, inspect, release, and hand off hardware projects. Product portfolios
-such as OpenDrone keep their own policy, accepted exceptions, naming, and
+keep their own policy, accepted exceptions, naming, and
 publication orchestration in their own repositories.
 
 The repository is intentionally split by concern:
@@ -113,8 +113,10 @@ python3 hardware/agents_section_sync.py --template _template/AGENTS.md \
 
 ## Visual index check
 
-`overview_check.py` validates a repository's diagram-only `OVERVIEW.md`
-(root `AGENTS.md`, "Scope routing"). Pass one or more repository roots:
+`overview_check.py` validates an explicitly selected diagram-only `OVERVIEW.md`.
+Use it for the workspace ownership map or another deliberately maintained visual
+reference. Repository guides live in `README.md`; an overview is not required.
+Pass one or more repository roots:
 
 ```sh
 python3 overview_check.py /path/to/repo
@@ -133,6 +135,20 @@ python3 hardware/release/kicad_release.py path/to/board.kicad_pcb \
   --approved-violations path/to/approved-violations.json \
   --approval-key project/hardware/board
 ```
+
+The preparation sequence is:
+
+```mermaid
+flowchart LR
+    INPUT["Explicit board and approved findings"] --> DRC["ERC and DRC"]
+    DRC --> MODELS["3D model checks"]
+    MODELS --> FAB["Fabrication exports and checks"]
+    FAB --> STEP["STEP export"]
+    STEP --> PDF["Schematic PDF"]
+    PDF --> READY["Prepared artifacts"]
+```
+
+Publication and purchasing require their own approval after preparation.
 
 ## Multi-board plugin
 
@@ -173,8 +189,7 @@ missing.
 
 `templates/hardware-repository/` defines the hardware-agnostic repository
 contract. A product organization may layer its own README, license, library,
-status, community, and release profile on top; OpenDrone's concrete profile
-lives in `OpenDrone-hw/hardware-template`.
+status, community, and release profile on top.
 
 ## Ownership rule
 

@@ -21,7 +21,7 @@ carries only generic placeholder terms and documents the file format.
 by walking up from the current directory; pass it explicitly when running
 from elsewhere. `--repo` limits the scan to one or more repository names
 ("root" for the workspace root, otherwise the `path` field from
-`repos.json`, for example "erp" or "OpenDrone/hardware/OpenFrame").
+`repos.json`, for example "operations" or "products/controller").
 
 A repository entry is scanned only when its directory exists on disk and is
 a Git checkout; entries that are not cloned locally are silently skipped, so
