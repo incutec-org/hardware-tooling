@@ -20,9 +20,9 @@ Produces, next to the other release artifacts:
                         Silkscreen only: drawing the fabrication layer as well
                         covers parts with the filled body outlines some
                         footprints carry on F.Fab.
-  <stem>_assembly.pdf   printable assembly drawing per side, board edge plus
-                        fabrication layer plus silkscreen, the attachment a
-                        fab expects on the order.
+  <stem>_assembly.pdf   the assembly drawings as one printable vector file,
+                        one page per side, the attachment a fab expects on
+                        the order.
   reference report      returned to the caller, not written here: duplicate
                         board references and board references with no
                         schematic symbol.
@@ -192,36 +192,55 @@ def render_ibom(board_path, stem, out_dir, sch_path=None, netlist_xml=None):
     return target
 
 
+def svg_to_pdf(svg_path, pdf_path):
+    """First converter that produces a file wins."""
+    for tool, command in (
+            ('rsvg-convert', ['rsvg-convert', '-f', 'pdf', '-o', pdf_path, svg_path]),
+            ('cairosvg', ['cairosvg', svg_path, '-o', pdf_path]),
+            ('magick', ['magick', svg_path, pdf_path])):
+        if not shutil.which(tool):
+            continue
+        subprocess.run(command, capture_output=True)
+        if os.path.isfile(pdf_path) and os.path.getsize(pdf_path):
+            return True
+    return False
+
+
 def render_assembly_pdf(board_path, stem, out_dir):
-    """Write <stem>_assembly.pdf, one page per side. Returns path or None."""
-    cli = kicad_cli()
-    if not cli:
-        return None
+    """Write <stem>_assembly.pdf, one page per side. Returns path or None.
+
+    Built from the assembly drawings rather than a kicad-cli layer plot. The
+    drawings already carry what a fab reviewer needs, a title, a legend, pin 1
+    in red and not-placed parts hatched, with the board filling the page. A
+    layer plot puts a 38 mm board 1:1 in the middle of an A4 frame with an
+    empty title block, which is unreadable.
+    """
     os.makedirs(out_dir, exist_ok=True)
-    pages = []
+    sides = [os.path.join(out_dir, f'{stem}_assembly_{side}.svg')
+             for side in ('top', 'bottom')]
+    if not all(os.path.isfile(path) for path in sides):
+        try:
+            import assembly_drawing
+            assembly_drawing.render(board_path, stem, out_dir, dpi=300, png=False)
+        except Exception:
+            return None
+    sides = [path for path in sides if os.path.isfile(path)]
+    if not sides:
+        return None
+    target = os.path.join(out_dir, f'{stem}_assembly.pdf')
     with tempfile.TemporaryDirectory() as work:
-        for side, fab, silk in (('top', 'F.Fab', 'F.SilkS'),
-                                ('bottom', 'B.Fab', 'B.SilkS')):
-            page = os.path.join(work, f'{side}.pdf')
-            command = [cli, 'pcb', 'export', 'pdf', '-o', page,
-                       '--layers', f'Edge.Cuts,{fab},{silk}',
-                       '--include-border-title',
-                       '--crossout-DNP-footprints-on-fab-layers']
-            if side == 'bottom':
-                command.append('--mirror')
-            if subprocess.run(command + [board_path],
-                              capture_output=True, text=True).returncode == 0 \
-                    and os.path.isfile(page):
+        pages = []
+        for index, svg in enumerate(sides):
+            page = os.path.join(work, f'{index}.pdf')
+            if svg_to_pdf(svg, page):
                 pages.append(page)
         if not pages:
             return None
-        target = os.path.join(out_dir, f'{stem}_assembly.pdf')
         if len(pages) == 1:
             shutil.copy2(pages[0], target)
-            return target
-        if not merge_pdf(pages, target):
+        elif not merge_pdf(pages, target):
             shutil.copy2(pages[0], target)
-        return target
+    return target if os.path.isfile(target) else None
 
 
 def merge_pdf(pages, target):
