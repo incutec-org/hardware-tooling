@@ -54,6 +54,7 @@ command explicitly says otherwise.
 | `gerber_check.py` | Classify and validate a Gerber archive. |
 | `cam_compare.py` | Compare a fabricator's CAM Gerbers with the released set and review the differences in an interactive workspace with an editable, exportable report. |
 | `assembly_drawing.py` | Render per-side assembly drawings with pin-1 markings. |
+| `assembly_pack.py` | Interactive BOM, assembly PDF, and a duplicate/unsourced reference report for fab review. |
 | `import_part.py` | Import an LCSC part into an explicitly selected project library. |
 | `set_edgecuts_width.py` | Normalize `Edge.Cuts` widths; dry-run unless `--write` is passed. |
 
