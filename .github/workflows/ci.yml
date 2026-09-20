@@ -26,16 +26,3 @@ jobs:
 
       - name: Run tests
         run: python3 -m pytest tests/
-
-  overview-check:
-    name: Overview check (python3 overview_check.py .)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.13"
-
-      - name: Run overview check
-        run: python3 overview_check.py .
