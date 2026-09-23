@@ -23,11 +23,11 @@ from elsewhere. `--repo` limits the scan to one or more repository names
 ("root" for the workspace root, otherwise the `path` field from
 `repos.json`, for example "operations" or "products/controller").
 
-A repository entry is scanned only when its directory exists on disk and is
-a Git checkout; entries that are not cloned locally are silently skipped, so
-this tool degrades gracefully when it runs from a worktree that has no
-sibling checkouts. Exit status 1 when a hit exists outside the term list's
-allowlist, 0 otherwise (including when nothing was scanned).
+A repository entry is scanned only when its directory is a Git checkout
+root. Default discovery skips entries not cloned locally; an explicit --repo
+request fails with exit status 2 when unknown or unavailable. Exit status 1
+when a hit exists outside the term list's allowlist, 0 otherwise (including
+when default discovery finds nothing to scan).
 """
 
 from __future__ import annotations
@@ -110,14 +110,14 @@ def compile_terms(terms: list[dict]) -> list[tuple[str, re.Pattern]]:
 def is_git_checkout(path: Path) -> bool:
     try:
         result = subprocess.run(
-            ["git", "-C", str(path), "rev-parse", "--is-inside-work-tree"],
+            ["git", "-C", str(path), "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
             check=False,
         )
     except FileNotFoundError:
         return False
-    return result.returncode == 0 and result.stdout.strip() == "true"
+    return result.returncode == 0 and Path(result.stdout.strip()).resolve() == path.resolve()
 
 
 def tracked_files(path: Path) -> list[str]:
@@ -134,6 +134,10 @@ def resolve_repositories(
     workspace_root: Path, only: set[str] | None
 ) -> tuple[list[tuple[str, Path]], list[str]]:
     manifest = json.loads((workspace_root / "repos.json").read_text(encoding="utf-8"))
+    names = {"root" if entry["path"] == "." else entry["path"]
+             for entry in manifest["repositories"]}
+    if only is not None and only - names:
+        raise ValueError(f"unknown repository selection: {', '.join(sorted(only - names))}")
     scanned: list[tuple[str, Path]] = []
     skipped: list[str] = []
 
@@ -148,6 +152,8 @@ def resolve_repositories(
             continue
         scanned.append((name, disk_path))
 
+    if only is not None and skipped:
+        raise ValueError(f"selected repositories are not available Git checkouts: {', '.join(sorted(skipped))}")
     return scanned, skipped
 
 
@@ -217,7 +223,11 @@ def main(argv: list[str] | None = None) -> int:
     compiled_terms = compile_terms(terms)
     only = set(args.repo) if args.repo else None
 
-    scanned, skipped = resolve_repositories(workspace_root, only)
+    try:
+        scanned, skipped = resolve_repositories(workspace_root, only)
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
     all_hits: list[Hit] = []
     for name, disk_path in scanned:
