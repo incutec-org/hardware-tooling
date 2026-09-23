@@ -4,6 +4,7 @@
 The section body between the `## <name>` heading and the next `## ` heading is
 taken verbatim from the template and written into each target. Use --check to
 report drift without writing; the exit code is 1 when any target differs.
+Missing required sections fail with exit 1 in either mode, before any writes.
 
 Example:
     python3 agents_section_sync.py --template _template/AGENTS.md \
@@ -42,7 +43,11 @@ def main() -> int:
     parser.add_argument("targets", nargs="+", type=Path)
     args = parser.parse_args()
 
-    template_text = args.template.read_text(encoding="utf-8")
+    try:
+        template_text = args.template.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     span = split_section(template_text, args.section)
     if span is None:
         print(f"error: section '## {args.section}' not in {args.template}",
@@ -50,33 +55,42 @@ def main() -> int:
         return 2
     canonical = template_text[span[0]:span[1]]
 
-    drift = False
+    missing = False
+    changes = []
     for target in args.targets:
         if target.resolve() == args.template.resolve():
             continue
-        text = target.read_text(encoding="utf-8")
+        try:
+            text = target.read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
         tspan = split_section(text, args.section)
         if tspan is None:
             if args.skip_missing:
                 print(f"skipped  {target}: no '## {args.section}' section")
             else:
                 print(f"MISSING  {target}: no '## {args.section}' section")
-                drift = True
+                missing = True
             continue
         if text[tspan[0]:tspan[1]] == canonical:
             print(f"ok       {target}")
             continue
-        drift = True
+        changes.append((target, text[:tspan[0]] + canonical + text[tspan[1]:]))
+
+    if missing and not args.check:
+        return 1
+    for target, replacement in changes:
         if args.check:
             print(f"DRIFT    {target}")
         else:
             target.write_text(
-                text[:tspan[0]] + canonical + text[tspan[1]:],
+                replacement,
                 encoding="utf-8",
             )
             print(f"synced   {target}")
 
-    return 1 if (drift and args.check) else 0
+    return 1 if missing or (changes and args.check) else 0
 
 
 if __name__ == "__main__":

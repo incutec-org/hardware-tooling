@@ -106,6 +106,8 @@ $KPY hardware/kicad/packaging_art.py path/to/board.kicad_pcb --outdir packaging/
 a template Markdown file into target files, or reports drift with `--check`
 (exit 1 when any target differs). Product portfolios use it to keep a shared
 section of their board `AGENTS.md` files identical to their template.
+Missing required sections exit 1 in both modes, before any target is written.
+Use `--skip-missing` only to explicitly exclude targets without that section.
 
 ```sh
 python3 hardware/agents_section_sync.py --template _template/AGENTS.md \
@@ -184,7 +186,9 @@ python3 docs/stale_check.py --workspace-root /path/to/workspace --repo erp --jso
 ```
 
 Exit status 1 when a hit exists outside the allowlist, 2 when the term list is
-missing.
+missing or an explicit `--repo` selection is unknown or unavailable. Default
+discovery skips uncloned repositories. A directory inside another checkout
+does not count as an independently cloned repository.
 
 ## Repository template
 

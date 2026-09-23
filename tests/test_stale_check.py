@@ -131,6 +131,28 @@ class StaleCheckTests(unittest.TestCase):
         scanned, _ = stale_check.resolve_repositories(self.workspace, {"erp"})
         self.assertEqual([name for name, _ in scanned], ["erp"])
 
+    def test_explicit_unknown_or_unavailable_repositories_fail_before_scanning(self):
+        self.build_workspace()
+        for selection in ("typo", "not-cloned"):
+            with self.subTest(selection=selection):
+                result = subprocess.run(
+                    [sys.executable, str(MODULE_PATH), "--workspace-root", str(self.workspace),
+                     "--repo", "erp", "--repo", selection, "--json"],
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(selection, result.stderr)
+                self.assertEqual(result.stdout, "")
+
+    def test_directory_inside_parent_checkout_is_not_a_repository(self):
+        self.build_workspace()
+        (self.workspace / "not-cloned").mkdir()
+        scanned, skipped = stale_check.resolve_repositories(self.workspace, None)
+        self.assertIn("not-cloned", skipped)
+        self.assertNotIn("not-cloned", [name for name, _ in scanned])
+        with self.assertRaisesRegex(ValueError, "not available Git checkouts"):
+            stale_check.resolve_repositories(self.workspace, {"not-cloned"})
+
     def test_example_terms_file_is_loadable(self):
         terms, allowlist = stale_check.load_terms(stale_check.EXAMPLE_TERMS_PATH)
         self.assertTrue(terms)
