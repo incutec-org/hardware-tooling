@@ -5,7 +5,8 @@ kicad-cli DRC. Written because the only checks before this ran on the board
 file; nothing looked at what actually left the building.
 
     python3 gerber_check.py <gerbers.zip> [--board board.kicad_pcb]
-                            [--min-track 0.09] [--min-drill 0.2] [-o report.txt]
+                            [--min-track 0.09] [--min-drill 0.2]
+                            [--max-hole-density 900000] [-o report.txt]
 
 Checks, each PASS / WARN / FAIL:
   G1  file set: F/B copper, inner layers, F/B mask, F/B paste, F/B silk,
@@ -14,7 +15,9 @@ Checks, each PASS / WARN / FAIL:
   G2  min drawn line width per copper layer (smallest circular aperture used
       by a D01 draw) against --min-track; smallest flash/draw on outer layers
   G3  drill: tool sizes and hit counts, smallest against --min-drill,
-      PTH/NPTH split, any tool below 0.15 mm
+      PTH/NPTH split, any tool below 0.15 mm; hole density (PTH + NPTH
+      hits per m2 of the outline bbox) against --max-hole-density, WARN
+      only: fabs price dense boards in a higher tier, it is not a defect
   G4  outline: Edge.Cuts is closed (every endpoint has even degree);
       overlapping segments reported as WARN; reports the outline size
   G5  every copper/mask/paste feature lies inside the outline bbox (+0.3 mm);
@@ -122,6 +125,18 @@ def parse_drill(text):
     return tools, hits
 
 
+def hole_density(holes, bbox):
+    """Holes per square metre of the outline bounding box, or None.
+
+    The bbox slightly overstates the area of a board with rounded corners or
+    cut-outs, so the density is a lower bound: a WARN is never a false alarm.
+    """
+    if not bbox:
+        return None
+    area_m2 = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) / 1e6
+    return holes / area_m2 if area_m2 > 0 else None
+
+
 def closed_loops(segs, tol=0.002):
     """(open endpoints, overlap junctions): endpoint degree odd = open,
     degree > 2 = outline segments overlapping (board edge + footprint edge)."""
@@ -139,6 +154,8 @@ def main():
     ap.add_argument('--board')
     ap.add_argument('--min-track', type=float, default=0.09)
     ap.add_argument('--min-drill', type=float, default=0.2)
+    ap.add_argument('--max-hole-density', type=float, default=900000,
+                    help='holes per m2 above which G3 warns (a common fab price tier); 0 disables')
     ap.add_argument('-o', '--output')
     a = ap.parse_args()
 
@@ -222,6 +239,7 @@ def main():
     say('G5', 'PASS', 'containment checked on every copper/mask/paste layer (WARN lines above if any)')
 
     # G3 drills
+    total_holes = 0
     for kind in ('pth', 'npth'):
         for n in kinds.get((kind, ''), []):
             if not n.lower().endswith('.drl'):
@@ -236,6 +254,16 @@ def main():
             if dmin < 0.15:
                 st = 'FAIL'
             say('G3', st, f"{n}: {desc}")
+            total_holes += sum(hits.values())
+    density = hole_density(total_holes, bbox)
+    if density is not None and a.max_hole_density > 0:
+        over = density > a.max_hole_density
+        say('G3', 'WARN' if over else 'PASS',
+            f"hole density {density / 1e6:.2f}M/m2 ({total_holes} holes on "
+            f"{bbox[2] - bbox[0]:.1f} x {bbox[3] - bbox[1]:.1f} mm), "
+            + (f"above {a.max_hole_density / 1e6:.2f}M/m2: many fabs price this in a "
+               f"higher tier; about {total_holes - int(a.max_hole_density * (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) / 1e6)} "
+               f"holes over" if over else f"within {a.max_hole_density / 1e6:.2f}M/m2"))
 
     # G6 DRC
     if a.board and os.path.exists(KICAD_CLI):

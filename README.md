@@ -51,7 +51,7 @@ command explicitly says otherwise.
 | `universal_bom.py` | Generate a manufacturer/MPN-aware BOM. |
 | `quote_pack.py` | Assemble generic and supplier-formatted fabrication inputs. |
 | `portal_gerbers.py` | Produce a compatibility copy for limited upload parsers. |
-| `gerber_check.py` | Classify and validate a Gerber archive. |
+| `gerber_check.py` | Classify and validate a Gerber archive; warns (never fails) when hole density exceeds `--max-hole-density`, default 900,000 holes/m². |
 | `cam_compare.py` | Compare a fabricator's CAM Gerbers with the released set and review the differences in an interactive workspace with an editable, exportable report. |
 | `assembly_drawing.py` | Render per-side assembly drawings with pin-1 markings. |
 | `assembly_pack.py` | Interactive BOM, assembly PDF, and a duplicate/unsourced reference report for fab review. |
