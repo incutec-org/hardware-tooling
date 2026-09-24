@@ -89,6 +89,15 @@ def read_universal(path):
         return list(csv.DictReader(f))
 
 
+def write_jlcpcb(rows, path):
+    """JLCPCB assembly BOM, Fabrication Toolkit column layout."""
+    with open(path, 'w', newline='') as f:
+        w = csv.writer(f)
+        w.writerow(['Designator', 'Footprint', 'Quantity', 'Value', 'LCSC Part #'])
+        for r in rows:
+            w.writerow([r['Designator'], r['Footprint'], r['Quantity'], r['Value'], r['LCSC']])
+
+
 def write_nextpcb(rows, path):
     with open(path, 'w', newline='') as f:
         w = csv.writer(f)
