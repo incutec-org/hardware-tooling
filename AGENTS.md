@@ -36,6 +36,7 @@ python3 -m pytest tests/
   installed in KiCad.
 - Prepare a release: `python3 hardware/release/kicad_release.py <board.kicad_pcb> --approved-violations <file> --approval-key <key>`
   (`README.md`, "Release preparation").
+- Check a mechanical repo (frame, mount, enclosure): `python3 hardware/mechanical_check.py <repo>`; start one from `templates/mechanical-repository/`.
 - Sync a shared `AGENTS.md` section: `python3 hardware/agents_section_sync.py --template <template.md> --section <name> --check <targets...>`;
   drop `--check` to write.
 - Run the test suite: `python3 -m pytest tests/`.

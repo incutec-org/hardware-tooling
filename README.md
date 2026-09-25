@@ -11,7 +11,9 @@ The repository is intentionally split by concern:
 hardware/kicad/                 reusable KiCad inspection and export tools
 hardware/release/               hardware release preparation and approval gates
 hardware/agents_section_sync.py copy one Markdown section from a template into files
-templates/hardware-repository/  generic starting point for a hardware repo
+templates/hardware-repository/  generic starting point for a PCB repo
+templates/mechanical-repository/  starting point for a mechanical repo (frames, mounts, enclosures)
+hardware/mechanical_check.py   check a mechanical repo against that template
 docs/                           repository-agnostic documentation scanning
 overview_check.py               check a repository's OVERVIEW.md visual index
 tests/                          regression tests
@@ -190,7 +192,12 @@ missing or an explicit `--repo` selection is unknown or unavailable. Default
 discovery skips uncloned repositories. A directory inside another checkout
 does not count as an independently cloned repository.
 
-## Repository template
+## Repository templates
+
+| Template | For | Design source | Check |
+|---|---|---|---|
+| `templates/hardware-repository/` | circuit boards | KiCad, in the repo | ERC, DRC, approved violations |
+| `templates/mechanical-repository/` | frames, mounts, enclosures | Onshape, linked from `cad/onshape.json` | `hardware/mechanical_check.py` |
 
 `templates/hardware-repository/` defines the hardware-agnostic repository
 contract. A product organization may layer its own README, license, library,

@@ -1,0 +1,11 @@
+# Exports are binary: no text diff, no line-ending rewrite.
+*.step   binary
+*.stp    binary
+*.stl    binary
+*.3mf    binary
+*.dxf    binary
+*.pdf    binary
+*.png    binary
+*.jpg    binary
+
+images/**   linguist-documentation

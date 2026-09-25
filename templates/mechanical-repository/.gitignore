@@ -1,0 +1,18 @@
+# Incutec mechanical repository.
+# Commit the CAD link, the parts lists and released exports.
+# Ignore scratch exports and machine-local state.
+
+.DS_Store
+__pycache__/
+*.pyc
+
+# Scratch exports: only releases/<rev>/ written by onshape_release.py is committed.
+export/
+exports/
+scratch/
+
+# Agent files stay local; AGENTS.md is the committed agent guide.
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.cursor/
