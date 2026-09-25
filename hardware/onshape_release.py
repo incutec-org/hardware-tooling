@@ -3,6 +3,7 @@
 
     python3 hardware/onshape_release.py <repo>/cad/onshape.json --version <label>          # dry run
     python3 hardware/onshape_release.py <repo>/cad/onshape.json --version <label> --apply
+    python3 hardware/onshape_release.py <repo>/cad/onshape.json --version <label> --agent-branch   # dry run on the branch
 
 The link file names one Onshape document and workspace, its elements and its
 parts (templates/mechanical-repository/cad/onshape.json). The dry run reads the
@@ -19,7 +20,14 @@ the live document), then exports from that version one STEP per part marked
 
 The manifest lists every file with its SHA-256 (the format
 hardware/mechanical_check.py verifies) plus the document, version id,
-microversion, elements, parts and export time. An existing release directory
+microversion, elements, parts and export time.
+
+A part the assembly takes from an older document version is exported from
+that version, not from the new one. The link file names it with
+"sourceVersion" (and "sourceMicroversion") plus "elementId"; a released part
+the link file leaves unset is resolved from the assembly when every instance
+of it references one version. --workspace <wid> or --agent-branch (the link
+file's "agentBranch") reads another workspace, for example a branch. An existing release directory
 is never overwritten, and a label already used as an Onshape version name is
 refused. Files are written to a hidden staging directory and moved into place
 only after every export succeeded.
@@ -36,7 +44,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from onshape_api import Client, OnshapeError, load_registry  # noqa: E402
+from onshape_api import (Client, OnshapeError, load_registry, part_element, part_source,  # noqa: E402
+                         resolve_part_sources, select_workspace)
 
 LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 UNSAFE = re.compile(r"[^A-Za-z0-9._ -]+")
@@ -63,8 +72,12 @@ def plan_files(registry: dict) -> list[dict]:
     for part in registry["parts"]:
         if part.get("release") is True:
             path = unique(f"step/{safe_name(part['name'])}.step", part["partId"])
-            files.append({"kind": "step", "path": path, "element": part["partStudio"],
-                          "partId": part["partId"], "name": part["name"]})
+            item = {"kind": "step", "path": path, "element": part_element(part),
+                    "partId": part["partId"], "name": part["name"]}
+            for key in ("sourceVersion", "sourceMicroversion"):
+                if part.get(key):
+                    item[key] = part[key]
+            files.append(item)
     for element in registry["elements"]:
         if element.get("type") == "DRAWING":
             path = unique(f"drawings/{safe_name(element['name'])}.pdf", element["id"])
@@ -81,23 +94,35 @@ def repo_root(registry_path: Path, override: Path | None) -> Path:
     return registry_path.parent.parent
 
 
-def check_live(client: Client, registry: dict) -> list[str]:
-    """Compare the link file with the live workspace. Returns problems."""
+def check_live(client: Client, registry: dict, wid: str) -> list[str]:
+    """Compare the link file with the live workspace, and each version-sourced
+    part with its version. Returns problems."""
     did = registry["document"]["id"]
-    wid = registry["workspace"]["id"]
     problems = []
     live = {e["id"]: e for e in client.get(f"/documents/d/{did}/w/{wid}/elements")}
     for element in registry["elements"]:
         if element["id"] not in live:
             problems.append(f"element {element['name']!r} ({element['id']}) is not in the workspace")
-    studios = sorted({p["partStudio"] for p in registry["parts"] if p.get("release") is True})
-    for eid in studios:
-        if eid not in live:
+    released = [p for p in registry["parts"] if p.get("release") is True]
+    listed: dict[tuple, set] = {}
+    for part in released:
+        source = part_source(part)
+        if source and source[0] == "m":
+            problems.append(f"part {part['name']!r} ({part['partId']}) is pinned to microversion {source[1]} "
+                            "without a version; a STEP export needs a version")
             continue
-        ids = {p["partId"] for p in client.get(f"/parts/d/{did}/w/{wid}/e/{eid}")}
-        for part in registry["parts"]:
-            if part["partStudio"] == eid and part.get("release") is True and part["partId"] not in ids:
-                problems.append(f"part {part['name']!r} ({part['partId']}) is not in Part Studio {eid}")
+        key = ("v", source[1], part_element(part)) if source else ("w", wid, part_element(part))
+        if key[0] == "w" and key[2] not in live:
+            continue
+        if key not in listed:
+            kind, ref, eid = key
+            try:
+                listed[key] = {p["partId"] for p in client.get(f"/parts/d/{did}/{kind}/{ref}/e/{eid}")}
+            except OnshapeError:
+                listed[key] = set()
+        if part["partId"] not in listed[key]:
+            where = f"version {key[1]} of element {key[2]}" if key[0] == "v" else f"Part Studio {key[2]}"
+            problems.append(f"part {part['name']!r} ({part['partId']}) is not in {where}")
     return problems
 
 
@@ -112,7 +137,8 @@ def export_file(client: Client, did: str, vid: str, item: dict) -> bytes:
     if item["kind"] == "step":
         body = {"formatName": "STEP", "partIds": item["partId"], "storeInDocument": False,
                 "flattenAssemblies": False}
-        start = client.post(f"/partstudios/d/{did}/v/{vid}/e/{item['element']}/translations", body)
+        source = item.get("sourceVersion") or vid
+        start = client.post(f"/partstudios/d/{did}/v/{source}/e/{item['element']}/translations", body)
     else:
         body = {"formatName": "PDF", "storeInDocument": False}
         start = client.post(f"/drawings/d/{did}/v/{vid}/e/{item['element']}/translations", body)
@@ -128,14 +154,20 @@ def run(args, client: Client, now=None) -> int:
         raise OnshapeError("--version must be 1-64 of letters, digits, '.', '_' or '-', starting alphanumeric")
     target = root / "releases" / args.version
     did = registry["document"]["id"]
-    wid = registry["workspace"]["id"]
-    files = plan_files(registry)
+    wid = select_workspace(registry, args.workspace, args.agent_branch)
     doc = client.get(f"/documents/{did}")
+    problems = resolve_part_sources(client, registry, wid)
+    files = plan_files(registry)
+    names = {v["id"]: v.get("name") for v in client.get(f"/documents/d/{did}/versions") or []}
 
+    known = {registry["workspace"]["id"]: registry["workspace"].get("name")}
+    if registry.get("agentBranch"):
+        known[registry["agentBranch"]["id"]] = registry["agentBranch"].get("name")
+    label = known.get(wid)
     print(f"Document   {doc.get('name')} ({did}), owner {doc.get('owner', {}).get('name')}")
-    print(f"Workspace  {registry['workspace'].get('name')} ({wid})")
+    print(f"Workspace  {label or 'workspace'} ({wid})")
     print(f"Target     {target}")
-    problems = check_live(client, registry)
+    problems += check_live(client, registry, wid)
     if target.exists():
         problems.append(f"{target} exists; a release directory is never overwritten")
     if existing_version(client, did, args.version):
@@ -145,6 +177,8 @@ def run(args, client: Client, now=None) -> int:
     print(("Would create" if not args.apply else "Creating") + f" Onshape version {args.version!r} of workspace {wid}")
     for item in files:
         source = f"part {item['partId']} of {item['element']}" if item["kind"] == "step" else f"drawing {item['element']}"
+        if item.get("sourceVersion"):
+            source += f" from version {names.get(item['sourceVersion']) or item['sourceVersion']}"
         print(f"  {item['path']:<48} {source}  ({item['name']})")
     print(f"  manifest.json")
     print(f"{len(files)} file(s): {sum(f['kind'] == 'step' for f in files)} STEP, "
@@ -185,7 +219,8 @@ def run(args, client: Client, now=None) -> int:
             "version": {"id": vid, "name": args.version},
             "microversion": microversion,
             "elements": registry["elements"],
-            "parts": [{"partStudio": f["element"], "partId": f["partId"], "name": f["name"], "path": f["path"]}
+            "parts": [{"partStudio": f["element"], "partId": f["partId"], "name": f["name"], "path": f["path"],
+                       **{k: f[k] for k in ("sourceVersion", "sourceMicroversion") if f.get(k)}}
                       for f in files if f["kind"] == "step"],
             "exported_at": stamp,
             "tool": "onshape_release.py",
@@ -210,6 +245,9 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("link", help="path to the one-workspace link file, normally <repo>/cad/onshape.json")
     result.add_argument("--version", required=True, help="release label, used as Onshape version name and directory")
     result.add_argument("--repo", type=Path, help="product repository root when the link file is not <repo>/cad/")
+    result.add_argument("--workspace", help="workspace id to release from instead of the link file's")
+    result.add_argument("--agent-branch", action="store_true",
+                        help="use the link file's \"agentBranch\" workspace")
     result.add_argument("--apply", action="store_true", help="create the Onshape version and write the files")
     return result
 

@@ -218,9 +218,99 @@ def load_registry(path: Path) -> dict:
             raise OnshapeError(f'{path}: "{key}" must be a list')
     known = {e.get("id") for e in registry["elements"]}
     for part in registry["parts"]:
-        if part.get("partStudio") not in known:
+        if part_source(part):
+            if not part_element(part):
+                raise OnshapeError(f"{path}: part {part.get('name')!r} has a source version but no elementId")
+        elif part.get("partStudio") not in known:
             raise OnshapeError(f"{path}: part {part.get('name')!r} names an unknown partStudio")
+    branch = registry.get("agentBranch")
+    if branch is not None and (not isinstance(branch, dict) or not branch.get("id")):
+        raise OnshapeError(f'{path}: "agentBranch" must be an object with an "id"')
     return registry
+
+
+def part_element(part: dict) -> str | None:
+    """The Part Studio element a registry part comes from."""
+    return part.get("elementId") or part.get("partStudio")
+
+
+def part_source(part: dict) -> tuple[str, str] | None:
+    """("v", version id) or ("m", microversion id) for a part taken from an older
+    document version, None for a part of the workspace."""
+    if part.get("sourceVersion"):
+        return ("v", part["sourceVersion"])
+    if part.get("sourceMicroversion"):
+        return ("m", part["sourceMicroversion"])
+    return None
+
+
+def select_workspace(registry: dict, workspace: str | None = None, agent_branch: bool = False) -> str:
+    """The workspace a tool reads: --workspace, the link file's "agentBranch" or its workspace."""
+    if workspace and agent_branch:
+        raise OnshapeError("--workspace and --agent-branch exclude each other")
+    if workspace:
+        return workspace
+    if agent_branch:
+        branch = registry.get("agentBranch")
+        if not branch:
+            raise OnshapeError('--agent-branch: the link file has no "agentBranch"')
+        return branch["id"]
+    return registry["workspace"]["id"]
+
+
+def assembly_sources(client: "Client", registry: dict, wid: str) -> dict[tuple[str, str], set]:
+    """Map (element, partId) of every frame-document part instanced in the listed
+    assembly to the set of sources it is instanced from: ("v", version id,
+    microversion) for a version reference, ("w",) for the workspace."""
+    did = registry["document"]["id"]
+    assemblies = [e for e in registry["elements"] if e.get("type") == "ASSEMBLY"]
+    if not assemblies:
+        return {}
+    data = client.get(f"/assemblies/d/{did}/w/{wid}/e/{assemblies[0]['id']}")
+    instances = list(data["rootAssembly"].get("instances", []))
+    for sub in data.get("subAssemblies", []):
+        instances.extend(sub.get("instances", []))
+    sources: dict[tuple[str, str], set] = {}
+    for inst in instances:
+        if inst.get("type") != "Part" or inst.get("documentId") != did or inst.get("suppressed"):
+            continue
+        key = (inst.get("elementId"), inst.get("partId"))
+        if inst.get("documentVersion"):
+            source = ("v", inst["documentVersion"], inst.get("documentMicroversion"))
+        else:
+            source = ("w",)
+        sources.setdefault(key, set()).add(source)
+    return sources
+
+
+def resolve_part_sources(client: "Client", registry: dict, wid: str) -> list[str]:
+    """Fill "sourceVersion"/"sourceMicroversion" from the assembly for parts the
+    link file leaves unset and the assembly instances only from one version.
+    Returns problems: a part instanced from several sources, or a link file
+    version the assembly does not reference."""
+    problems = []
+    sources = assembly_sources(client, registry, wid)
+    for part in registry["parts"]:
+        found = sources.get((part_element(part), part["partId"]), set())
+        versions = {s for s in found if s[0] == "v"}
+        if not versions:
+            continue
+        if part_source(part):
+            if part.get("sourceVersion") and part["sourceVersion"] not in {s[1] for s in versions}:
+                problems.append(f"part {part['name']!r} ({part['partId']}): the link file names version "
+                                f"{part['sourceVersion']}, the assembly references "
+                                f"{', '.join(sorted(s[1] for s in versions))}")
+            continue
+        if len(found) > 1:
+            problems.append(f"part {part['name']!r} ({part['partId']}) is instanced from more than one "
+                            "source; set sourceVersion in the link file")
+            continue
+        (_, vid, mid), = versions
+        part["sourceVersion"] = vid
+        if mid:
+            part["sourceMicroversion"] = mid
+        part["sourceResolved"] = "assembly"
+    return problems
 
 
 def main(argv=None) -> int:

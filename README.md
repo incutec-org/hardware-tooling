@@ -248,14 +248,24 @@ verifies), `document`, `version`, `microversion`, `elements`, `parts` and
 already used in the document, and moves the files into place only after every
 export succeeded.
 
+A part the assembly takes from an older document version is exported from
+that version. The link file names it with `"sourceVersion"` (optionally
+`"sourceMicroversion"`) and `"elementId"`; a released part without them is
+resolved from the assembly when all its instances reference one version. The
+dry run refuses a part missing from its version, a link file version the
+assembly does not reference, and a part instanced from more than one source.
+`--workspace <wid>` reads another workspace; `--agent-branch` reads the link
+file's `"agentBranch": {"id": ..., "name": ...}`.
+
 `onshape_model_check.py` compares the live model with the link file and the
 parts lists and prints the README "Model checks" table (`| Check | Finding |`),
-or `--json`. `--workspace <wid>` checks another workspace, such as a branch.
+or `--json`. `--workspace <wid>` checks another workspace, such as a branch;
+`--agent-branch` checks the link file's `"agentBranch"`.
 
 | Check | Finds |
 | --- | --- |
-| Link file | a listed element or part id is gone, or the part was renamed |
-| Missing parts | an assembly instance with no source, pinned to a document version, or naming a deleted part id |
+| Link file | a listed element or part id is gone, the part was renamed, or a `sourceVersion` part is not in that version or not the one the assembly references |
+| Missing parts | an assembly instance with no source, naming a deleted part id, or referencing a document version that lacks the part |
 | Unused parts | a part of a released Part Studio that the assembly does not instance |
 | Materials | a used or released part with no material |
 | Drawing | no drawing listed, or the listed element is not a drawing |
@@ -263,7 +273,9 @@ or `--json`. `--workspace <wid>` checks another workspace, such as a branch.
 | Hardware | `hardware.csv` and the assembly's standard content disagree on a count (`--repo`) |
 
 An item that is deliberately not in `hardware.csv` is listed in the link file
-under `"modelCheck": {"ignoreHardware": ["<name>"]}`. Exit 0 no findings,
+under `"modelCheck": {"ignoreHardware": ["<name>"]}`, and a Part Studio part
+deliberately left out of the assembly under `"modelCheck": {"ignoreUnused": ["<name>"]}`.
+An instance that references an older version having the part is not a finding. Exit 0 no findings,
 1 findings, 2 error.
 
 `onshape_fit.py` imports a KiCad board STEP, flattened, into a document that

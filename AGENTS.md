@@ -37,9 +37,9 @@ python3 -m pytest tests/
 - Prepare a release: `python3 hardware/release/kicad_release.py <board.kicad_pcb> --approved-violations <file> --approval-key <key>`
   (`README.md`, "Release preparation").
 - Check a mechanical repo (frame, mount, enclosure): `python3 hardware/mechanical_check.py <repo>`; start one from `templates/mechanical-repository/`.
-- Release a mechanical design from Onshape: `python3 hardware/onshape_release.py <repo>/cad/onshape.json --version <rev>`;
+- Release a mechanical design from Onshape: `python3 hardware/onshape_release.py <repo>/cad/onshape.json --version <rev> [--agent-branch]`;
   review the dry run, then `--apply` (creates an Onshape version, writes `releases/<rev>/`).
-- Check an Onshape model against its repo: `python3 hardware/onshape_model_check.py <repo>/cad/onshape.json --repo <repo> [--workspace <wid>]`;
+- Check an Onshape model against its repo: `python3 hardware/onshape_model_check.py <repo>/cad/onshape.json --repo <repo> [--workspace <wid> | --agent-branch]`;
   prints the README "Model checks" table, exit 1 on findings.
 - Fit-check a board in a frame: `python3 hardware/onshape_fit.py --board-step <step> --cad <link> --target-document <scratch did> --align-to <Part Studio> --apply`.
 - Sync a shared `AGENTS.md` section: `python3 hardware/agents_section_sync.py --template <template.md> --section <name> --check <targets...>`;

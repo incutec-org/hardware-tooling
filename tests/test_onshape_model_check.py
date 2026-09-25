@@ -154,24 +154,68 @@ class ModelCheckTests(unittest.TestCase):
     def test_pinned_dangling_and_sourceless_instances(self):
         instances = clean_assembly() + [
             inst("V", "VTX-Mount <1>", pid="REBH", version=OLD),
+            inst("P", "Pad <1>", pid="GONE", version=OLD),
             inst("G", "Ghost <1>", pid="GONE"),
             {"id": "B", "name": "Bumper <1>"},
         ]
         found = self.findings(routes(instances=instances))
-        self.assertIn(("Missing parts", "`VTX-Mount <1>` points at part `REBH` in version `V4`, not at the "
-                                        "workspace; the workspace `frame` Part Studio has no part of that name"), found)
+        self.assertNotIn("VTX-Mount <1>", " ".join(m for c, m in found if c == "Missing parts"))
+        self.assertIn(("Missing parts", "`Pad <1>` points at part `GONE` in version `V4`, which does not have it"),
+                      found)
         self.assertIn(("Missing parts", "`Ghost <1>` points at part id `GONE`, which is not in `frame`"), found)
         self.assertIn(("Missing parts", "`Bumper <1>` has no source part (deleted or not shared)"), found)
         self.assertIn(("Materials", "`VTX-Mount` has no material set in the model"), found)
         self.assertIn(("Parts list", "`VTX-Mount`: assembly 1, not in parts.csv"), found)
 
-    def test_pinned_instance_names_the_workspace_part_of_the_same_name(self):
+    def test_part_from_its_version_is_clean(self):
+        reg = registry()
+        reg["parts"].append({"elementId": PS, "partStudio": PS, "partId": "REBH", "name": "VTX-Mount",
+                             "release": True, "sourceVersion": OLD})
+        self.write_registry(reg)
+        (self.repo / "parts.csv").write_text(
+            PARTS_HEADER + "Arm,arm,,,2,,,JHD\nCam-Mount-L,mount,,,1,,,J/D\nCam-Mount-R,mount,,,1,,,RzD\n"
+            "VTX-Mount,mount,,,1,,,REBH\n")
+        table = routes(instances=clean_assembly() + [inst("V", "VTX-Mount <1>", pid="REBH", version=OLD)])
+        table[("GET", f"/api/v10/parts/d/{DID}/v/{OLD}/e/{PS}")] = [part("REBH", "VTX-Mount", "TPU")]
+        code, out, err, _ = self.run_check(table)
+        self.assertEqual(code, 0, out + err)
+
+    def test_link_file_version_checks(self):
+        reg = registry()
+        reg["parts"] += [
+            {"elementId": PS, "partId": "REBH", "name": "VTX-Mount", "release": True, "sourceVersion": "n" * 24},
+            {"elementId": PS, "partId": "RLED", "name": "Pad", "release": True, "sourceVersion": OLD}]
+        self.write_registry(reg)
+        table = routes(instances=clean_assembly() + [inst("V", "VTX-Mount <1>", pid="REBH", version=OLD)])
+        table[("GET", f"/api/v10/documents/d/{DID}/versions")] = [{"id": OLD, "name": "V4"},
+                                                                  {"id": "n" * 24, "name": "V5"}]
+        table[("GET", f"/api/v10/parts/d/{DID}/v/{'n' * 24}/e/{PS}")] = [part("REBH", "VTX-Mount", None)]
+        found = self.findings(table)
+        self.assertIn(("Link file", "part `Pad` (RLED) is not in version `V4`"), found)
+        self.assertIn(("Link file", "part `VTX-Mount` (REBH): the link file names version `V5`, "
+                                    "the assembly references `V4`"), found)
+
+    def test_ignore_unused_list(self):
         parts = [part("JHD", "Arm"), part("J/D", "Cam-Mount-L", "PLA"), part("RzD", "Cam-Mount-R", "PLA"),
-                 part("RDBH", "VTX-Mount", "PLA")]
-        instances = clean_assembly() + [inst("V", "VTX-Mount <1>", pid="REBH", version=OLD)]
-        found = self.findings(routes(instances=instances, parts=parts))
-        self.assertIn(("Missing parts", "`VTX-Mount <1>` points at part `REBH` in version `V4`, not at the "
-                                        "workspace; the workspace `frame` Part Studio has it as `RDBH`"), found)
+                 part("P19", "Bumpr", None), part("RFC", "Receiver-Mount", None)]
+        self.write_registry(registry(modelCheck={"ignoreUnused": ["Bumpr"]}))
+        found = self.findings(routes(parts=parts))
+        self.assertIn(("Unused parts", "`Receiver-Mount` is in the `frame` Part Studio but not in the assembly"),
+                      found)
+        self.write_registry(registry(modelCheck={"ignoreUnused": ["Bumpr", "Receiver-Mount"]}))
+        self.assertNotIn("Unused parts", {c for c, _ in self.findings(routes(parts=parts))})
+
+    def test_agent_branch_flag_reads_the_branch(self):
+        self.write_registry(registry(agentBranch={"id": BRANCH, "name": "agent/x"}))
+        code, out, err, transport = self.run_check(routes(wid=BRANCH), "--agent-branch")
+        self.assertEqual(code, 0, out + err)
+        self.assertTrue(all(WID not in path for _, path in transport.calls))
+        code, _, err, _ = self.run_check(routes(wid=BRANCH), "--agent-branch", "--workspace", BRANCH)
+        self.assertEqual(code, 2)
+        self.write_registry(registry())
+        code, _, err, _ = self.run_check(routes(), "--agent-branch")
+        self.assertEqual(code, 2)
+        self.assertIn("agentBranch", err)
 
     def test_materials_cover_released_and_used_parts_only(self):
         parts = [part("JHD", "Arm", None), part("J/D", "Cam-Mount-L", "PLA"), part("RzD", "Cam-Mount-R", None),
