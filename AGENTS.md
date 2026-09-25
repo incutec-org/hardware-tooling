@@ -42,4 +42,5 @@ python3 -m pytest tests/
 - Fit-check a board in a frame: `python3 hardware/onshape_fit.py --board-step <step> --cad <link> --target-document <scratch did> --align-to <Part Studio> --apply`.
 - Sync a shared `AGENTS.md` section: `python3 hardware/agents_section_sync.py --template <template.md> --section <name> --check <targets...>`;
   drop `--check` to write.
+- Check that Mermaid diagrams render: `python3 hardware/mermaid_check.py <files or dirs>` (needs Node.js; skips without it).
 - Run the test suite: `python3 -m pytest tests/`.

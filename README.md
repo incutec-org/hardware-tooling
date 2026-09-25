@@ -11,6 +11,7 @@ The repository is intentionally split by concern:
 hardware/kicad/                 reusable KiCad inspection and export tools
 hardware/release/               hardware release preparation and approval gates
 hardware/agents_section_sync.py copy one Markdown section from a template into files
+hardware/mermaid_check.py       render every Mermaid block in Markdown and report failures
 templates/hardware-repository/  generic starting point for a PCB repo
 templates/mechanical-repository/  starting point for a mechanical repo (frames, mounts, enclosures)
 hardware/mechanical_check.py   check a mechanical repo against that template
@@ -115,6 +116,21 @@ Use `--skip-missing` only to explicitly exclude targets without that section.
 ```sh
 python3 hardware/agents_section_sync.py --template _template/AGENTS.md \
   --section Rules --check boards/*/AGENTS.md
+```
+
+## Mermaid check
+
+`hardware/mermaid_check.py` extracts every ```` ```mermaid ```` block from the
+given Markdown files or directories (skipping `node_modules` and `.git`) and
+renders each with the Mermaid CLI: `$MMDC`, else `mmdc` on `PATH`, else
+`npx -y @mermaid-js/mermaid-cli`. A block that fails prints `file:line` and the
+parser error and the tool exits 1. It warns, without failing, about a raw `"`
+inside a quoted label (write `#quot;` or `5 inch`), an angle bracket that is
+not `<br/>`, and `subgraph`, which Notion does not render. Without Node.js the
+check is skipped with a message.
+
+```sh
+python3 hardware/mermaid_check.py README.md docs/
 ```
 
 ## Visual index check
