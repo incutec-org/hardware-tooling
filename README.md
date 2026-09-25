@@ -14,6 +14,7 @@ hardware/agents_section_sync.py copy one Markdown section from a template into f
 templates/hardware-repository/  generic starting point for a PCB repo
 templates/mechanical-repository/  starting point for a mechanical repo (frames, mounts, enclosures)
 hardware/mechanical_check.py   check a mechanical repo against that template
+hardware/onshape_*.py          Onshape release export and board fit check
 docs/                           repository-agnostic documentation scanning
 overview_check.py               check a repository's OVERVIEW.md visual index
 tests/                          regression tests
@@ -198,6 +199,46 @@ does not count as an independently cloned repository.
 |---|---|---|---|
 | `templates/hardware-repository/` | circuit boards | KiCad, in the repo | ERC, DRC, approved violations |
 | `templates/mechanical-repository/` | frames, mounts, enclosures | Onshape, linked from `cad/onshape.json` | `hardware/mechanical_check.py` |
+
+## Onshape
+
+Standard library only (certifi used when installed). The three tools read
+`ONSHAPE_ACCESS_KEY` and `ONSHAPE_SECRET_KEY` from the environment, then `.env`
+at this repository's root, then `~/.config/incutec/credentials.env`
+(`INCUTEC_CREDENTIALS_FILE` overrides the path). Every command is a read-only
+dry run until `--apply`.
+
+| Tool | Reads | `--apply` writes |
+| --- | --- | --- |
+| `onshape_api.py whoami` | the key owner | nothing |
+| `onshape_release.py <repo>/cad/onshape.json --version <rev>` | the link file and the live workspace | a named Onshape version, then `<repo>/releases/<rev>/` |
+| `onshape_fit.py --board-step <step> --cad <link> --target-document <did>` | the frame assembly | one imported Part Studio tab in the target document |
+
+```mermaid
+flowchart LR
+  L["cad/onshape.json"] --> D["dry run: check ids, list files"]
+  D --> V["--apply: Onshape version rev"]
+  V --> X["STEP per released part, PDF per drawing"]
+  X --> R["releases/rev/ + manifest.json"]
+  R --> C["mechanical_check.py"]
+```
+
+`onshape_release.py` exports the parts marked `"release": true` and every
+`DRAWING` element from the new version, never from the moving workspace. The
+manifest holds `files` (path and SHA-256, the format `mechanical_check.py`
+verifies), `document`, `version`, `microversion`, `elements`, `parts` and
+`exported_at`. It refuses an existing `releases/<rev>/` and a version name
+already used in the document, and moves the files into place only after every
+export succeeded.
+
+`onshape_fit.py` imports a KiCad board STEP, flattened, into a document that
+is not the frame document, compares each board body with each instance of a
+listed frame part and prints overlaps in millimetres. `--align-to <Part Studio>`
+puts the board where that Part Studio sits in the frame assembly, `--offset
+X,Y,Z` (mm) shifts it, `--remove-tab` deletes the import afterwards. The
+comparison is bounding-box overlap per body: a hit is a candidate to inspect in
+Onshape, a clean run proves the boxes are clear. Exit 0 clear, 1 overlaps, 2
+error.
 
 `templates/hardware-repository/` defines the hardware-agnostic repository
 contract. A product organization may layer its own README, license, library,
