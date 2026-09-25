@@ -221,6 +221,13 @@ class ModelCheckTests(unittest.TestCase):
         found = self.findings(routes(instances=instances))
         self.assertNotIn(("Hardware", "`Prevailing torque nut M5x0.80`: assembly 1, not in hardware.csv"), found)
 
+    def test_hardware_inside_a_flattened_import_counts_by_part_name(self):
+        instances = clean_assembly() + [
+            inst(f"F{n}", f"Flat head screw:1__Body{n} <1>", element="i" * 24, pid=f"F{n}") for n in (1, 2)]
+        (self.repo / "hardware.csv").write_text(
+            HARDWARE_HEADER + "m3 pressnut,,,1,\nSocket button head screw M3x0.5 x 8,,,1,\nFlat head screw,,,2,\n")
+        self.assertNotIn("Hardware", {check for check, _ in self.findings(routes(instances=instances))})
+
     def test_without_repo_skips_the_csv_checks(self):
         (self.repo / "hardware.csv").write_text(HARDWARE_HEADER + "Nothing,,,9,\n")
         code, out, err, _ = self.run_check(routes(), repo=False)

@@ -18,7 +18,8 @@ branch workspace) and reports:
 
 "Part Studio" means every Part Studio that holds a part marked "release": true.
 Hardware in the assembly is standard content plus instances from the other
-listed Part Studios. An item listed in the link file under
+listed Part Studios; hardware names are counted without the instance number
+and without the ":1__Body3" suffix a flattened STEP import adds. An item listed in the link file under
 "modelCheck": {"ignoreHardware": [...]} is left out of the hardware check.
 
 Prints a Markdown table in the "Model checks" format of a mechanical repository
@@ -41,10 +42,15 @@ from onshape_api import Client, OnshapeError, load_registry, quote  # noqa: E402
 CHECKS = ["Link file", "Missing parts", "Unused parts", "Materials", "Drawing", "Parts list", "Hardware"]
 DRAWING_TYPE = "onshape-app/drawing"
 INSTANCE_SUFFIX = re.compile(r"\s*<\d+>$")
+IMPORT_BODY = re.compile(r"\s*:\d+__.*$")  # a flattened STEP import names bodies "<part>:1__Body3"
 
 
 def base_name(name: str) -> str:
     return INSTANCE_SUFFIX.sub("", name or "")
+
+
+def hardware_name(name: str) -> str:
+    return IMPORT_BODY.sub("", base_name(name))
 
 
 def code(text: str) -> str:
@@ -247,8 +253,8 @@ def check(model: Model, repo: Path | None) -> list[dict]:
     if hardware_csv.is_file():
         ignore = set((reg.get("modelCheck") or {}).get("ignoreHardware") or [])
         other_studios = {p["partStudio"] for p in reg["parts"]} - set(model.release_studios)
-        counts: Counter = Counter(base_name(i.get("name", "")) for i in model.occurrences if i.get("type"))
-        hardware = {base_name(i["name"]) for i in model.occurrences
+        counts: Counter = Counter(hardware_name(i.get("name", "")) for i in model.occurrences if i.get("type"))
+        hardware = {hardware_name(i["name"]) for i in model.occurrences
                     if i.get("isStandardContent") or (i.get("documentId") == model.did
                                                       and i.get("elementId") in other_studios)}
         listed = set()
