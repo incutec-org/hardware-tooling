@@ -14,7 +14,7 @@ hardware/agents_section_sync.py copy one Markdown section from a template into f
 templates/hardware-repository/  generic starting point for a PCB repo
 templates/mechanical-repository/  starting point for a mechanical repo (frames, mounts, enclosures)
 hardware/mechanical_check.py   check a mechanical repo against that template
-hardware/onshape_*.py          Onshape release export and board fit check
+hardware/onshape_*.py          Onshape release export, model check and board fit check
 docs/                           repository-agnostic documentation scanning
 overview_check.py               check a repository's OVERVIEW.md visual index
 tests/                          regression tests
@@ -202,7 +202,7 @@ does not count as an independently cloned repository.
 
 ## Onshape
 
-Standard library only (certifi used when installed). The three tools read
+Standard library only (certifi used when installed). The tools read
 `ONSHAPE_ACCESS_KEY` and `ONSHAPE_SECRET_KEY` from the environment, then `.env`
 at this repository's root, then `~/.config/incutec/credentials.env`
 (`INCUTEC_CREDENTIALS_FILE` overrides the path). Every command is a read-only
@@ -213,6 +213,7 @@ dry run until `--apply`.
 | `onshape_api.py whoami` | the key owner | nothing |
 | `onshape_release.py <repo>/cad/onshape.json --version <rev>` | the link file and the live workspace | a named Onshape version, then `<repo>/releases/<rev>/` |
 | `onshape_fit.py --board-step <step> --cad <link> --target-document <did>` | the frame assembly | one imported Part Studio tab in the target document |
+| `onshape_model_check.py <repo>/cad/onshape.json --repo <repo>` | the link file, the live workspace, `parts.csv`, `hardware.csv` | nothing, it has no `--apply` |
 
 ```mermaid
 flowchart LR
@@ -230,6 +231,24 @@ verifies), `document`, `version`, `microversion`, `elements`, `parts` and
 `exported_at`. It refuses an existing `releases/<rev>/` and a version name
 already used in the document, and moves the files into place only after every
 export succeeded.
+
+`onshape_model_check.py` compares the live model with the link file and the
+parts lists and prints the README "Model checks" table (`| Check | Finding |`),
+or `--json`. `--workspace <wid>` checks another workspace, such as a branch.
+
+| Check | Finds |
+| --- | --- |
+| Link file | a listed element or part id is gone, or the part was renamed |
+| Missing parts | an assembly instance with no source, pinned to a document version, or naming a deleted part id |
+| Unused parts | a part of a released Part Studio that the assembly does not instance |
+| Materials | a used or released part with no material |
+| Drawing | no drawing listed, or the listed element is not a drawing |
+| Parts list | `parts.csv` and the assembly disagree on a part or its count (`--repo`) |
+| Hardware | `hardware.csv` and the assembly's standard content disagree on a count (`--repo`) |
+
+An item that is deliberately not in `hardware.csv` is listed in the link file
+under `"modelCheck": {"ignoreHardware": ["<name>"]}`. Exit 0 no findings,
+1 findings, 2 error.
 
 `onshape_fit.py` imports a KiCad board STEP, flattened, into a document that
 is not the frame document, compares each board body with each instance of a
