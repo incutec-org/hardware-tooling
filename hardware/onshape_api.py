@@ -143,9 +143,14 @@ class Client:
     def json(self, method: str, path: str, query=None, body=None):
         status, payload = self.raw(method, path, query=query, body=body)
         if status == 204 or not payload:
-            if method != "GET" and method != "DELETE":
-                raise OnshapeError(f"{method} {path}: HTTP {status} with an empty body; nothing was done")
-            return None
+            # `raw` already raised on status >= 400, so any empty body reaching
+            # here came from a 2xx (or 3xx) response: the write happened. Some
+            # Onshape writes (assembly instance insert, transform) answer this
+            # way. Never report a completed 2xx write as "nothing was done" -
+            # that invites a caller retry that duplicates the write.
+            if method in ("GET", "DELETE"):
+                return None
+            return {"status": status}
         return json.loads(payload)
 
     def get(self, path, **query):

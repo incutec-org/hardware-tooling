@@ -130,6 +130,40 @@ class KeyLookupTests(unittest.TestCase):
         self.assertIn("ONSHAPE_ACCESS_KEY", str(ctx.exception))
 
 
+class EmptyWriteResponseTests(unittest.TestCase):
+    """Onshape answers some writes (assembly instance insert, transform) with a
+    2xx and an empty body. The client must report success, never "nothing was
+    done" - a caller that saw an error there could retry and duplicate the write."""
+
+    def test_empty_200_body_on_post_is_reported_as_success(self):
+        transport = FakeTransport({("POST", "/api/v10/thing"): (200, b"")})
+        client = api.Client(transport)
+        result = client.post("/thing", {"x": 1})
+        self.assertEqual(result, {"status": 200})
+
+    def test_204_no_content_on_post_is_reported_as_success(self):
+        transport = FakeTransport({("POST", "/api/v10/thing"): (204, b"")})
+        client = api.Client(transport)
+        result = client.post("/thing", {"x": 1})
+        self.assertEqual(result, {"status": 204})
+
+    def test_empty_200_body_on_put_is_reported_as_success(self):
+        transport = FakeTransport({("PUT", "/api/v10/thing"): (200, b"")})
+        client = api.Client(transport)
+        result = client.json("PUT", "/thing", body={"x": 1})
+        self.assertEqual(result, {"status": 200})
+
+    def test_empty_body_on_get_still_returns_none(self):
+        transport = FakeTransport({("GET", "/api/v10/thing"): (200, b"")})
+        client = api.Client(transport)
+        self.assertIsNone(client.get("/thing"))
+
+    def test_empty_body_on_delete_still_returns_none(self):
+        transport = FakeTransport({("DELETE", "/api/v10/thing"): (204, b"")})
+        client = api.Client(transport)
+        self.assertIsNone(client.json("DELETE", "/thing"))
+
+
 class ReleaseTests(RepoCase):
     def run_release(self, transport, *extra):
         client = api.Client(transport, sleep=lambda s: None)
