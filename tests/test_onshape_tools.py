@@ -64,7 +64,15 @@ class FakeTransport:
         return [c for c in self.calls if c[0] != "GET"]
 
 
-def release_routes(versions=None, fail_pdf=False):
+OLD = "o" * 24
+
+
+def asm_instance(pid, version=None, element=PS):
+    return {"id": f"I{pid}", "name": f"{pid} <1>", "type": "Part", "documentId": DID, "elementId": element,
+            "partId": pid, "documentVersion": version, "documentMicroversion": "q" * 24 if version else "m" * 24}
+
+
+def release_routes(versions=None, fail_pdf=False, instances=None, wid=WID):
     counter = {"n": 0}
 
     def start(body):
@@ -73,13 +81,18 @@ def release_routes(versions=None, fail_pdf=False):
 
     return {
         ("GET", f"/api/v10/documents/{DID}"): {"name": "Frame", "owner": {"name": "Owner"}},
-        ("GET", f"/api/v10/documents/d/{DID}/w/{WID}/elements"): [
+        ("GET", f"/api/v10/assemblies/d/{DID}/w/{wid}/e/{ASM}"): {
+            "rootAssembly": {"instances": instances if instances is not None else
+                             [asm_instance("JHD"), asm_instance("J/D")]}, "subAssemblies": []},
+        ("GET", f"/api/v10/documents/d/{DID}/w/{wid}/elements"): [
             {"id": PS, "name": "frame", "elementType": "PARTSTUDIO"},
             {"id": ASM, "name": "Frame assembly", "elementType": "ASSEMBLY"},
             {"id": DRW, "name": "Drawing 1", "elementType": "APPLICATION"},
         ],
-        ("GET", f"/api/v10/parts/d/{DID}/w/{WID}/e/{PS}"): [
+        ("GET", f"/api/v10/parts/d/{DID}/w/{wid}/e/{PS}"): [
             {"partId": "JHD"}, {"partId": "J/D"}, {"partId": "RhD"}],
+        ("GET", f"/api/v10/parts/d/{DID}/v/{OLD}/e/{PS}"): [{"partId": "REBH"}],
+        ("POST", f"/api/v10/partstudios/d/{DID}/v/{OLD}/e/{PS}/translations"): start,
         ("GET", f"/api/v10/documents/d/{DID}/versions"): versions or [],
         ("POST", f"/api/v10/documents/d/{DID}/versions"): {"id": "v" * 24, "microversion": "m" * 24},
         ("POST", f"/api/v10/partstudios/d/{DID}/v/{'v' * 24}/e/{PS}/translations"): start,
@@ -233,6 +246,64 @@ class ReleaseTests(RepoCase):
         self.assertEqual(code, 1)
         self.assertIn("not in Part Studio", err)
         self.assertEqual(transport.writes(), [])
+
+    def version_sourced(self, **extra):
+        reg = registry()
+        reg["parts"].append({"elementId": PS, "partId": "REBH", "name": "VTX-Mount", "release": True, **extra})
+        self.link.write_text(json.dumps(reg), encoding="utf-8")
+
+    def test_version_sourced_part_is_exported_from_its_version(self):
+        self.version_sourced(sourceVersion=OLD)
+        transport = FakeTransport(release_routes(versions=[{"id": OLD, "name": "V4"}]))
+        code, out, err = self.run_release(transport)
+        self.assertEqual(code, 0, err)
+        self.assertIn("from version V4", out)
+        self.assertIn("4 file(s): 3 STEP, 1 PDF", out)
+        code, out, err = self.run_release(transport, "--apply")
+        self.assertEqual(code, 0, err)
+        exports = [c[1] for c in transport.calls if c[1].endswith("/translations") and "/partstudios/" in c[1]]
+        self.assertIn(f"/api/v10/partstudios/d/{DID}/v/{OLD}/e/{PS}/translations", exports)
+        self.assertEqual(sum(f"/v/{'v' * 24}/" in e for e in exports), 2)
+        manifest = json.loads((self.repo / "releases" / "r1" / "manifest.json").read_text())
+        self.assertEqual([p.get("sourceVersion") for p in manifest["parts"]], [None, None, OLD])
+
+    def test_source_version_is_resolved_from_the_assembly(self):
+        reg = registry()
+        reg["parts"].append({"partStudio": PS, "partId": "REBH", "name": "VTX-Mount", "release": True})
+        self.link.write_text(json.dumps(reg), encoding="utf-8")
+        routes = release_routes(instances=[asm_instance("JHD"), asm_instance("J/D"), asm_instance("REBH", OLD)])
+        code, out, err = self.run_release(FakeTransport(routes))
+        self.assertEqual(code, 0, err)
+        self.assertIn(f"part REBH of {PS} from version {OLD}", out)
+
+    def test_version_problems_are_refused(self):
+        self.version_sourced(sourceVersion="n" * 24)
+        routes = release_routes(instances=[asm_instance("JHD"), asm_instance("J/D"), asm_instance("REBH", OLD)])
+        code, _, err = self.run_release(FakeTransport(routes))
+        self.assertEqual(code, 1)
+        self.assertIn("the assembly references", err)
+        self.assertIn(f"is not in version {'n' * 24}", err)
+        self.version_sourced(sourceMicroversion="q" * 24)
+        code, _, err = self.run_release(FakeTransport(release_routes()))
+        self.assertEqual(code, 1)
+        self.assertIn("a STEP export needs a version", err)
+
+    def test_part_instanced_from_two_sources_is_refused(self):
+        routes = release_routes(instances=[asm_instance("JHD"), asm_instance("JHD", OLD), asm_instance("J/D")])
+        code, _, err = self.run_release(FakeTransport(routes))
+        self.assertEqual(code, 1)
+        self.assertIn("more than one source", err)
+
+    def test_agent_branch_reads_the_branch_workspace(self):
+        branch = "b" * 24
+        reg = registry()
+        reg["agentBranch"] = {"id": branch, "name": "agent/x"}
+        self.link.write_text(json.dumps(reg), encoding="utf-8")
+        transport = FakeTransport(release_routes(wid=branch))
+        code, out, err = self.run_release(transport, "--agent-branch")
+        self.assertEqual(code, 0, err)
+        self.assertIn(f"Workspace  agent/x ({branch})", out)
+        self.assertTrue(all(WID not in c[1] for c in transport.calls))
 
     def test_bad_label_and_unknown_argument(self):
         code, _, err = self.run_release(FakeTransport(release_routes()), "--apply")
